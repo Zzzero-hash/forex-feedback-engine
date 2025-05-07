@@ -44,7 +44,7 @@ coverage.xml
 .pytest_cache/
 
 # Jupyter Notebook checkpoints
-.ipynb_checkpoints/
+.ipynb-checkpoints/
 
 # Environments
 .env
@@ -63,3 +63,25 @@ venv.bak/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# Ignore local config files containing sensitive credentials
+/src/config.py
+
+# Ignore environment variable files
+.env.*
+
+# Ignore logs
+*.log
+logs/
+
+# Ignore database files
+*.db
+*.sqlite3
+
+# Ignore editor directories and local history
+.idea/
+.history/
+
+# Ignore key and certificate files
+*.pem
+*.key
