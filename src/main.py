@@ -1,46 +1,38 @@
-import os
 import time
 from data.data_feed import DataFeed
 from data.otc_feed import OTCFeed
-from decision.llm_engine import DecisionEngine
-from src.data.data_feed import DataFeed
-from src.data.otc_feed import OTCFeed
-from src.ocr.capture import Capture
-from src.ocr.analyzer import Analyzer
-from src.decision.llm_engine import LLMEngine
-from src.execution.broker_api import BrokerAPI
-from src.feedback.feedback_loop import FeedbackLoop
-from src.config import Config
+from decision.llm_engine import LLMEngine
+from execution.broker_api import BrokerAPI
+from feedback.feedback_loop import FeedbackLoop
+from config import Config
 
 def main():
     # Initialize components
-    data_feed = DataFeed()
-    otc_feed = OTCFeed()
-    capture = Capture()
-    analyzer = Analyzer()
-    llm_engine = LLMEngine()
-    broker_api = BrokerAPI()
-    feedback_loop = FeedbackLoop()
+    cfg = Config()
+    data_feed     = DataFeed(api_key=cfg.alpha_vantage_api_key)
+    otc_feed      = OTCFeed()
+    engine        = DecisionEngine(api_key=cfg.openai_api_key)
+    broker_api    = BrokerAPI(ssid=cfg.po_ssid, demo=cfg.enable_demo_mode)
+    feedback_loop = FeedbackLoop(database_url=cfg.database_url)
 
     # Start the trading system
     while True:
-        # Fetch market data
-        market_data = data_feed.get_data()
-        otc_data = otc_feed.get_otc_data()
+        # 1) Fetch API data
+        spot_quote  = data_feed.get_quote()
+        otc_candle  = otc_feed.get_latest_candle("SYMBOL", cfg.otc_interval)
 
-        # Capture and analyze screen data
-        screenshot = capture.take_screenshot()
-        trading_info = analyzer.process_image(screenshot)
+        # 2) Ask LLM for a decision
+        decision = engine.decide(spot_quote, otc_candle)
 
-        # Make a trading decision
-        decision = llm_engine.make_decision(market_data, otc_data, trading_info)
-
-        # Execute the trade
-        if decision:
+        # 3) Execute trade if valid CALL/PUT
+        if decision.action in ("CALL", "PUT"):
             broker_api.execute_trade(decision)
 
-        # Log the outcome and adjust strategy
-        feedback_loop.track_outcome(decision)
+        # 4) Log feedback & update strategy
+        feedback_loop.track(decision)
+
+        # 5) Pause until next iteration
+        time.sleep(cfg.screen_interval)
 
 if __name__ == "__main__":
     main()
