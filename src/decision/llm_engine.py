@@ -1,9 +1,11 @@
-from openai import ChatCompletion
+from openai import OpenAI
 
 class LLMEngine:
     def __init__(self, api_key, prompt_config=None, model="gpt-3.5-turbo"):
         self.api_key = api_key
         self.model = model
+        # Initialize OpenAI client
+        self.client = OpenAI(api_key=self.api_key)
         # Use provided PromptConfig or default
         from .prompt_config import PromptConfig
         self.prompt_config = prompt_config or PromptConfig()
@@ -15,15 +17,13 @@ class LLMEngine:
         user_content = (
             f"Market Data: {market_data}\nRecent Trades: {recent_trades}"
         )
-        # Send messages to LLM
-        from openai import ChatCompletion
-        completion = ChatCompletion.create(
+        # Use OpenAI client to create a chat completion
+        completion = self.client.chat.completions.create(
             model=self.model,
             messages=[
                 {"role": "system", "content": system_msg},
                 {"role": "user", "content": user_content}
-            ],
-            api_key=self.api_key
+            ]
         )
         content = completion.choices[0].message.content
         return self._parse_response(content)

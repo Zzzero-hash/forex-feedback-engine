@@ -2,7 +2,7 @@ python-dotenv
 requests
 websockets
 alpha_vantage
-openai
+openai>=1.0.0
 pandas
 sqlalchemy
 pytest
