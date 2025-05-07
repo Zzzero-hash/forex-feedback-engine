@@ -1,32 +1,32 @@
 from openai import ChatCompletion
 
 class LLMEngine:
-    def __init__(self, api_key, model="gpt-3.5-turbo"):
+    def __init__(self, api_key, prompt_config=None, model="gpt-3.5-turbo"):
         self.api_key = api_key
         self.model = model
+        # Use provided PromptConfig or default
+        from .prompt_config import PromptConfig
+        self.prompt_config = prompt_config or PromptConfig()
 
     def get_decision(self, market_data, recent_trades):
-        prompt = self._create_prompt(market_data, recent_trades)
-        response = self._call_llm(prompt)
-        return self._parse_response(response)
-
-    def _create_prompt(self, market_data, recent_trades):
-        return f"""
-        You are an expert binary options trader. Based on the following market data and recent trades, determine the next action:
-        
-        Market Data: {market_data}
-        Recent Trades: {recent_trades}
-        
-        Provide your decision as CALL, PUT, or NO TRADE, along with a brief justification.
-        """
-
-    def _call_llm(self, prompt):
+        # Build prompts via PromptConfig
+        system_msg = self.prompt_config.get_system_prompt()
+        # Flatten market_data and recent_trades into strings
+        user_content = (
+            f"Market Data: {market_data}\nRecent Trades: {recent_trades}"
+        )
+        # Send messages to LLM
+        from openai import ChatCompletion
         completion = ChatCompletion.create(
             model=self.model,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_content}
+            ],
             api_key=self.api_key
         )
-        return completion.choices[0].message.content
+        content = completion.choices[0].message.content
+        return self._parse_response(content)
 
     def _parse_response(self, response):
         if "CALL" in response:

@@ -1,12 +1,28 @@
 import os
 from typing import Dict, Any
-from pocketoptionapi.stable_api import PocketOption
+try:
+    from pocketoptionapi.stable_api import PocketOption
+except ImportError:
+    # Dummy PocketOption for testing/demo
+    class PocketOption:
+        def __init__(self, ssid=None):
+            pass
+        def connect(self):
+            return True
+        def get_otc_feed(self):
+            return {}
+        def get_otc_candles(self, symbol, interval):
+            return {}
+        def get_otc_symbols(self):
+            return {}
+        def get_otc_symbol_info(self, symbol):
+            return {}
 
 class OTCFeed:
     def __init__(self): 
         ssid = os.getenv("PO_SSID")
         if not ssid:
-            raise ValueError("Environtment viariable PO_SSID is required")
+            raise ValueError("Environment variable PO_SSID is required")
         self.api = PocketOption(ssid)
         connected = self.api.connect()
         if not connected:
@@ -37,11 +53,9 @@ class OTCFeed:
             dict: The OTC candles data.
         """
         try:
-            otc_candles = self.api.get_otc_candles(symbol, interval)
-            return otc_candles
+            return self.api.get_otc_candles(symbol, interval)
         except Exception as e:
             raise RuntimeError(f"Failed to fetch OTC candles: {e}")
-
 
     def get_otc_symbols(self) -> Dict[str, Any]:
         """
@@ -51,8 +65,7 @@ class OTCFeed:
             dict: The OTC symbols data.
         """
         try:
-            otc_symbols = self.api.get_otc_symbols()
-            return otc_symbols
+            return self.api.get_otc_symbols()
         except Exception as e:
             raise RuntimeError(f"Failed to fetch OTC symbols: {e}")
 
@@ -67,7 +80,6 @@ class OTCFeed:
             dict: The OTC symbol information data.
         """
         try:
-            otc_symbol_info = self.api.get_otc_symbol_info(symbol)
-            return otc_symbol_info
+            return self.api.get_otc_symbol_info(symbol)
         except Exception as e:
             raise RuntimeError(f"Failed to fetch OTC symbol info: {e}")

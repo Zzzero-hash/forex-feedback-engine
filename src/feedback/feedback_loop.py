@@ -71,3 +71,17 @@ class FeedbackLoop:
     def adjust_strategy(self):
         # Simple flag to indicate strategy was adjusted
         self.strategy_adjusted = True
+
+    def should_end_session(self, initial_balance: float, trade_amount: float,
+                           profit_target_pct: float, loss_limit_pct: float) -> bool:
+        """
+        Determine if session should end based on PnL reaching profit target or loss limit.
+        PnL percent = (wins - losses) * trade_amount / initial_balance * 100
+        """
+        wins = self.performance_metrics.get('wins', 0)
+        losses = self.performance_metrics.get('losses', 0)
+        pnl = (wins - losses) * trade_amount
+        pnl_pct = (pnl / initial_balance) * 100 if initial_balance else 0.0
+        if pnl_pct >= profit_target_pct or pnl_pct <= -loss_limit_pct:
+            return True
+        return False
