@@ -4,10 +4,6 @@ websockets
 alpha_vantage
 openai
 pandas
-mss
-numpy
-opencv-python
-pillow
 pytest
 pytest-mock
 pytest-asyncio
