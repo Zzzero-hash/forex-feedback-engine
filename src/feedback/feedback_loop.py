@@ -3,6 +3,19 @@ class FeedbackLoop:
         # Optional database URL for logging or persistence
         self.database_url = database_url
         self.trade_history = []
+        # Setup database connection if provided
+        if database_url:
+            from sqlalchemy import create_engine
+            from sqlalchemy.orm import sessionmaker
+            from .models import Base, Trade
+
+            self.engine = create_engine(database_url)
+            Base.metadata.create_all(self.engine)
+            Session = sessionmaker(bind=self.engine)
+            self.session = Session()
+        else:
+            self.session = None
+
         self.performance_metrics = {
             'total_trades': 0,
             'wins': 0,
@@ -31,6 +44,12 @@ class FeedbackLoop:
         else:
             self.performance_metrics['losses'] += 1
         self.update_win_rate()
+        # Persist trade to database if session available
+        if self.session:
+            from .models import Trade
+            trade = Trade(decision=decision, outcome=outcome)
+            self.session.add(trade)
+            self.session.commit()
 
     def calculate_win_rate(self):
         """Return the current win rate."""

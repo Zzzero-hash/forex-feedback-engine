@@ -4,6 +4,7 @@ websockets
 alpha_vantage
 openai
 pandas
+sqlalchemy
 pytest
 pytest-mock
 pytest-asyncio
