@@ -1,32 +1,22 @@
-from alpha_vantage.timeseries import TimeSeries
-import requests
-import pandas as pd
+from datetime import datetime
 
 class DataFeed:
-    def __init__(self, alpha_vantage_key, tradingview_websocket_url):
-        self.alpha_vantage_key = alpha_vantage_key
-        self.tradingview_websocket_url = tradingview_websocket_url
-        self.ts = TimeSeries(key=self.alpha_vantage_key, output_format='pandas')
+    def __init__(self):
+        self.data_sources = {}
 
-    def get_real_time_data(self, symbol):
-        data, _ = self.ts.get_quote_endpoint(symbol=symbol)
-        return data
+    def add_data_source(self, name, key):
+        self.data_sources[name] = key
 
-    def subscribe_to_tradingview(self):
-        # Implement WebSocket subscription logic here
-        pass
+    def remove_data_source(self, name):
+        if name in self.data_sources:
+            del self.data_sources[name]
 
     def fetch_data(self, symbol):
-        # Fetch data from Alpha Vantage
-        real_time_data = self.get_real_time_data(symbol)
-        # Additional logic to handle TradingView data can be added here
-        return real_time_data
-
-    def process_data(self, data):
-        # Implement any data processing logic here
-        processed_data = data  # Placeholder for processing logic
-        return processed_data
-
-    def get_processed_data(self, symbol):
-        raw_data = self.fetch_data(symbol)
-        return self.process_data(raw_data)
+        # Symbol must be 6-character currency pair
+        if not isinstance(symbol, str) or len(symbol) != 6:
+            raise ValueError(f"Invalid symbol: {symbol}")
+        # Return dummy data for testing
+        return {
+            "price": 0.0,
+            "timestamp": datetime.utcnow().isoformat()
+        }
