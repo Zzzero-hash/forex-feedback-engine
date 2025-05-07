@@ -23,7 +23,7 @@ class DataFeed:
         if self.fx:
             base = symbol[:3]
             quote = symbol[3:]
-            data, _ = self.fx.get_currency_exchange_rate(from_symbol=base, to_symbol=quote)
+            data, _ = self.fx.get_currency_exchange_rate(from_currency=base, to_currency=quote)
             price = float(data.get('5. Exchange Rate', 0.0))
             timestamp = data.get('6. Last Refreshed', datetime.utcnow().isoformat())
             return {"price": price, "timestamp": timestamp}
