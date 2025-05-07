@@ -1,4 +1,5 @@
 import time
+import logging
 from data.data_feed import DataFeed
 from data.otc_feed import OTCFeed
 from decision.llm_engine import LLMEngine
@@ -6,16 +7,12 @@ from execution.broker_api import BrokerAPI
 from feedback.feedback_loop import FeedbackLoop
 from config import Config
 
-def main():
-    # Initialize components
-    cfg = Config()
-    data_feed     = DataFeed(api_key=cfg.alpha_vantage_api_key)
-    otc_feed      = OTCFeed()
-    engine        = LLMEngine(api_key=cfg.openai_api_key)
-    broker_api    = BrokerAPI(ssid=cfg.po_ssid)
-    feedback_loop = FeedbackLoop(database_url=cfg.database_url)
-
-    # Start the trading system
+def run_session(cfg, data_feed, otc_feed, engine, broker_api, feedback_loop, max_iterations=None):
+    """
+    Run the trading loop. Optionally stop after max_iterations or session-end conditions.
+    Returns the trade history.
+    """
+    iteration = 0
     while True:
         # 1) Fetch API data
         spot_quote  = data_feed.get_quote('EURUSD')
@@ -26,17 +23,39 @@ def main():
 
         # 3) Execute trade if valid CALL/PUT
         if decision in ("CALL", "PUT"):
-            # Place trade and record outcome
             trade_id = broker_api.place_trade('EURUSD', cfg.trade_amount, decision, cfg.otc_interval)
             outcome = broker_api.check_trade_result(trade_id)
             feedback_loop.record_trade_outcome(decision, outcome)
 
-        # 4) Log feedback & update strategy
-        # Strategy adjustment can be triggered based on recent performance
+        # Strategy adjustment
         feedback_loop.adjust_strategy()
 
-        # 5) Pause until next iteration
-        time.sleep(cfg.screen_interval)
+        # Check session end conditions
+        if feedback_loop.should_end_session(cfg.initial_balance, cfg.trade_amount,
+                                         cfg.profit_target_pct, cfg.loss_limit_pct):
+            logging.info("Session end condition met. Exiting session.")
+            break
+
+        # Stop after max_iterations if defined
+        iteration += 1
+        if max_iterations and iteration >= max_iterations:
+            break
+
+    return feedback_loop.trade_history
+
+def main():
+    # Initialize components
+    cfg = Config()
+    # Configure logging
+    logging.basicConfig(level=cfg.log_level)
+    data_feed     = DataFeed(api_key=cfg.alpha_vantage_api_key)
+    otc_feed      = OTCFeed()
+    engine        = LLMEngine(api_key=cfg.openai_api_key)
+    broker_api    = BrokerAPI(ssid=cfg.po_ssid)
+    feedback_loop = FeedbackLoop(database_url=cfg.database_url)
+
+    # Run session (infinite unless session-end reached)
+    run_session(cfg, data_feed, otc_feed, engine, broker_api, feedback_loop)
 
 if __name__ == "__main__":
     main()

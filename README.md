@@ -1,72 +1,72 @@
 # Feedback Loop Trading System
 
-This project is a feedback-loop driven trading system designed for binary options trading. It integrates real-time market data from various exchanges and utilizes screen capture analysis to enhance trading decisions. The system is built using Python and is containerized with Docker for easy deployment and portability.
+This project is a feedback-loop driven trading system designed for binary options trading. It integrates real-time market data sources (e.g., Alpha Vantage, Pocket Option OTC feed) and uses an LLM-based decision engine with configurable risk management.
 
 ## Project Structure
 
-```
+```plaintext
 feedback_loop_trading_app
 ├── src
 │   ├── data
-│   │   ├── data_feed.py        # Handles real-time market data integration
-│   │   └── otc_feed.py         # Manages over-the-counter market data
-│   ├── ocr
-│   │   ├── capture.py          # Responsible for taking screenshots
-│   │   └── analyzer.py         # Processes images using OCR
+│   │   ├── data_feed.py        # Handles real-time market data (Alpha Vantage)
+│   │   └── otc_feed.py         # Manages OTC data via PocketOption API
 │   ├── decision
 │   │   ├── llm_engine.py       # Interfaces with the LLM API for trading decisions
-│   │   └── prompt_config.py     # Configuration for LLM prompts
+│   │   └── prompt_config.py    # Configurable LLM prompt templates & thresholds
 │   ├── execution
-│   │   └── broker_api.py       # Manages trade execution through the broker's API
+│   │   └── broker_api.py       # Manages trade execution through PocketOption API
 │   ├── feedback
-│   │   └── feedback_loop.py     # Tracks trade outcomes and adjusts strategies
-│   ├── config.py               # Configuration settings for the application
-│   └── main.py                 # Entry point of the application
-├── tests
-│   ├── test_data_feed.py       # Unit tests for data feed functionality
-│   ├── test_capture.py         # Unit tests for screen capture functionality
-│   └── test_feedback.py        # Unit tests for feedback loop functionality
-├── Dockerfile                   # Defines the Docker image for the application
-├── docker-compose.yml           # Orchestrates the services needed for the application
-├── requirements.txt             # Lists the Python dependencies required
-└── .env.example                 # Example of environment variables needed
+│   │   ├── models.py           # SQLAlchemy ORM models for persistence
+│   │   └── feedback_loop.py    # Records trade outcomes, risk management, strategy adjustment
+│   ├── config.py               # Loads environment variables and risk settings
+│   └── main.py                 # Entry point; run_session() implements the trading loop
+├── tests                       # Unit and integration tests
+├── Dockerfile                  # Defines Docker image
+├── requirements.txt            # Python dependencies
+└── .env.example                # Example environment variables
 ```
 
 ## Setup Instructions
 
-1. **Clone the Repository**
+1. Clone the repository:
    ```bash
    git clone <repository-url>
    cd feedback_loop_trading_app
    ```
-
-2. **Create a Virtual Environment**
+2. Create and activate a virtual environment:
    ```bash
-   python3 -m venv venv
+   python -m venv venv
+   # Windows
+   venv\Scripts\activate
+   # Unix/macOS
    source venv/bin/activate
    ```
-
-3. **Install Dependencies**
+3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
+4. Configure environment variables:
+   Copy `.env.example` to `.env` and fill in your API keys and session ID.
 
-4. **Configure Environment Variables**
-   Copy `.env.example` to `.env` and fill in the required variables.
+## Environment Variables
 
-5. **Build and Run the Docker Container**
-   ```bash
-   docker-compose up --build
-   ```
+Set the following in your `.env` file:
 
-## Usage
-
-- The application will start automatically and begin trading based on the configured strategies.
-- Monitor the logs for trade outcomes and performance metrics.
-
-## Testing
-
-To run the tests, ensure the virtual environment is activated and execute:
+```dotenv
+OPENAI_API_KEY=your_openai_api_key
+PO_SSID=your_pocket_option_session_id
+ALPHA_VANTAGE_API_KEY=your_alpha_vantage_api_key
+DATABASE_URL=sqlite:///trading_logs.db
+LOG_LEVEL=INFO
+INITIAL_BALANCE=1000.0       # Starting account balance for risk calculations
+PROFIT_TARGET_PCT=5.0        # End session when profit reaches this percent
+LOSS_LIMIT_PCT=2.0           # End session when loss reaches this percent
+OTC_INTERVAL=60              # Seconds per OTC candle
+SCREEN_INTERVAL=1.0          # Seconds between iterations
+TRADE_AMOUNT=1.0             # Amount per trade
+MAX_DAILY_LOSS=100.0         # (Optional) daily loss cap
+DEMO_MODE=True               # Use dummy API implementations for testing
+``` 
 ```bash
 pytest tests/
 ```
