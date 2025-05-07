@@ -8,7 +8,7 @@ class Config:
     po_ssid = os.getenv("PO_SSID")
     alpha_vantage_api_key = os.getenv("ALPHA_VANTAGE_KEY")
     openai_api_key = os.getenv("LLM_API_KEY")
-    log_level = os.getenv("LOG_LEVEL", "INFO")
+    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
     database_url = os.getenv("DATABASE_URL", "sqlite:///trading_logs.db")
     screenshot_dir = os.getenv("SCREENSHOT_DIR", "./screenshots")
     enable_demo_mode = os.getenv("DEMO_MODE", "False").lower() == "true"
