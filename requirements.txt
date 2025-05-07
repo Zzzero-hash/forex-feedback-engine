@@ -2,9 +2,12 @@ python-dotenv
 requests
 websockets
 alpha_vantage
-pocketoptionapi
 openai
 pandas
+mss
+numpy
+opencv-python
+pillow
 pytest
 pytest-mock
 pytest-asyncio

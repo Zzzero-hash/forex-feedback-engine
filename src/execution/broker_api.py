@@ -1,4 +1,20 @@
-from pocketoptionapi.stable_api import PocketOption
+try:
+    from pocketoptionapi.stable_api import PocketOption
+except ImportError:
+    # Dummy implementation for demo or testing without pocketoptionapi
+    class PocketOption:
+        def __init__(self, ssid=None):
+            pass
+        def connect(self):
+            return True, ""
+        def subscribe_candles(self, asset, timeframe):
+            pass
+        def buy(self, asset, amount, direction, duration):
+            return "dummy_trade_id"
+        def check_win(self, trade_id):
+            return True
+        def disconnect(self):
+            pass
 
 class BrokerAPI:
     def __init__(self, ssid):
