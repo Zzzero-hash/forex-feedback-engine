@@ -46,6 +46,16 @@ def run_session(cfg, data_feed, otc_feed, engine, broker_api, feedback_loop, max
 def main():
     # Initialize components
     cfg = Config()
+    # Ensure required API keys are provided
+    if not cfg.openai_api_key:
+        logging.error("OpenAI API key not set. Please set OPENAI_API_KEY in your .env or environment variables.")
+        return
+    if not cfg.po_ssid:
+        logging.error("Pocket Option SSID not set. Please set PO_SSID in your .env or environment variables.")
+        return
+    if not cfg.alpha_vantage_api_key:
+        logging.error("Alpha Vantage API key not set. Please set ALPHA_VANTAGE_API_KEY in your .env or environment variables.")
+        return
     # Configure logging
     logging.basicConfig(level=cfg.log_level)
     data_feed     = DataFeed(api_key=cfg.alpha_vantage_api_key)

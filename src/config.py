@@ -7,8 +7,8 @@ load_dotenv()
 class Config:
     api_key = os.getenv("API_KEY")
     po_ssid = os.getenv("PO_SSID")
-    alpha_vantage_api_key = os.getenv("ALPHA_VANTAGE_KEY")
-    openai_api_key = os.getenv("LLM_API_KEY")
+    alpha_vantage_api_key = os.getenv("ALPHA_VANTAGE_API_KEY") or os.getenv("ALPHA_VANTAGE_KEY")
+    openai_api_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
     # Convert log level name to numeric value, default INFO
     _raw_log_level = os.getenv("LOG_LEVEL", "INFO").upper()
     log_level = getattr(logging, _raw_log_level, logging.INFO)
