@@ -67,14 +67,47 @@ TRADE_AMOUNT=1.0             # Amount per trade
 MAX_DAILY_LOSS=100.0         # (Optional) daily loss cap
 DEMO_MODE=True               # Use dummy API implementations for testing
 ``` 
+
+## Usage
+
+### Local Run
+
+Run the trading application:
 ```bash
-pytest tests/
+python src/main.py
+```
+
+### Demo Mode
+
+To run a short demo session (e.g., 10 iterations), add a small wrapper or call `run_session()` directly in a script, for example:
+```python
+from src.main import run_session, Config, DataFeed, OTCFeed, LLMEngine, BrokerAPI, FeedbackLoop
+
+cfg = Config()
+# build components...
+trades = run_session(cfg, DataFeed(cfg.alpha_vantage_api_key), OTCFeed(), LLMEngine(cfg.openai_api_key), BrokerAPI(cfg.po_ssid), FeedbackLoop(cfg.database_url), max_iterations=10)
+print(trades)
+```
+
+### Docker
+
+Build and run the Docker image:
+```bash
+docker build -t feedback-trading .
+docker run --env-file .env feedback-trading
+```
+
+## Testing
+
+Run all tests:
+```bash
+pytest -q
 ```
 
 ## Contributing
 
-Contributions are welcome! Please submit a pull request or open an issue for any enhancements or bug fixes.
+Contributions are welcome! Please open an issue or pull request.
 
 ## License
 
-This project is licensed under the MIT License. See the LICENSE file for details.
+This project is licensed under the MIT License.
