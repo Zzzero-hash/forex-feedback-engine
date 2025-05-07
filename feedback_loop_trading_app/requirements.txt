@@ -1,0 +1,14 @@
+python-dotenv
+requests
+websockets
+alpha_vantage
+mss
+pytesseract
+opencv-python
+openai
+pandas
+tesseractshadow/tesseract4re
+postgresql
+pytest
+pytest-mock
+pytest-asyncio
