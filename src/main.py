@@ -1,11 +1,11 @@
 import time
 import logging
-from data.data_feed import DataFeed
-from data.otc_feed import OTCFeed
-from decision.llm_engine import LLMEngine
-from execution.broker_api import BrokerAPI
-from feedback.feedback_loop import FeedbackLoop
-from config import Config
+from .data.data_feed import DataFeed
+from .data.otc_feed import OTCFeed
+from .decision.llm_engine import LLMEngine
+from .execution.broker_api import BrokerAPI
+from .feedback.feedback_loop import FeedbackLoop
+from .config import Config
 
 def run_session(cfg, data_feed, otc_feed, engine, broker_api, feedback_loop, max_iterations=None):
     """

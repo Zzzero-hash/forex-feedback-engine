@@ -52,12 +52,12 @@ def make_cfg():
     return cfg
 
 @ pytest.mark.parametrize("decisions,outcomes,expected_trades", [
-    # Single win meets profit target: profit 10 => 10% >=5
+    # Single win (PnL +10 = +10% of initial_balance 100) meets profit target (5%). Stops.
     (["CALL"], [True], 1),
-    # Two losses reach loss limit: loss -1 loss_amount=10 => -10% <= -2
-    (["PUT", "PUT"], [False, False], 2),
-    # Mixed wins and losses, stop at profit target
-    (["CALL", "PUT", "CALL"], [True, False, True], 3),
+    # First loss (PnL -10 = -10% of initial_balance 100) meets loss limit (2%, i.e. PnL <= -2). Stops.
+    (["PUT", "PUT"], [False, False], 1), # Was 2
+    # First win (PnL +10 = +10% of initial_balance 100) meets profit target (5%). Stops.
+    (["CALL", "PUT", "CALL"], [True, False, True], 1), # Was 3
 ])
 def test_run_session_stops_on_risk(decisions, outcomes, expected_trades):
     cfg = make_cfg()
