@@ -1,3 +1,8 @@
+import logging  # Added
+
+# Get a specific logger for this module
+logger = logging.getLogger(__name__)  # Added
+
 try:
     from pocketoptionapi.stable_api import PocketOption
 except ImportError:
@@ -5,55 +10,97 @@ except ImportError:
     class PocketOption:
         def __init__(self, ssid=None):
             pass
+
         def connect(self):
             return True, ""
+
         def subscribe_candles(self, asset, timeframe):
             pass
+
         def buy(self, asset, amount, direction, duration):
             return "dummy_trade_id"
+
         def check_win(self, trade_id):
             return True
+
         def disconnect(self):
             pass
 
+
 class BrokerAPI:
     def __init__(self, ssid):
+        logger.info(f"BrokerAPI initializing with SSID: {ssid[:20]}...")  # Added log
         self.account = PocketOption(ssid=ssid)
         self.connected = self.connect()
 
     def connect(self):
+        logger.info("Attempting to connect to Pocket Option API...")  # Added log
         connected, msg = self.account.connect()
         if connected:
-            print("Connected to Pocket Option API.")
+            logger.info("Successfully connected to Pocket Option API.")  # Changed from print to logger.info
         else:
-            print(f"Connection failed: {msg}")
+            logger.error(f"Pocket Option API connection failed: {msg}")  # Changed from print to logger.error
         return connected
 
     def subscribe_candles(self, asset, timeframe):
         if self.connected:
+            logger.info(
+                f"Subscribing to {asset} candles with timeframe {timeframe}..."
+            )  # Added log
             self.account.subscribe_candles(asset, timeframe)
-            print(f"Subscribed to {asset} candles with timeframe {timeframe}.")
+            logger.info(f"Successfully subscribed to {asset} candles.")  # Changed from print to logger.info
         else:
-            print("Not connected to the broker API.")
+            logger.warning(
+                "Not connected to the broker API. Cannot subscribe to candles."
+            )  # Changed from print to logger.warning
 
     def place_trade(self, asset, amount, direction, duration):
         if self.connected:
-            trade_id = self.account.buy(asset, amount, direction, duration)
-            print(f"Trade placed: {direction} {amount} on {asset} for {duration} seconds.")
-            return trade_id
+            logger.info(
+                f"Attempting to place trade: {direction} {amount} on {asset} for {duration}s."
+            )  # Added log
+            try:
+                trade_id = self.account.buy(asset, amount, direction, duration)
+                logger.info(
+                    f"Trade placed via API. Asset: {asset}, Amount: {amount}, Direction: {direction}, Duration: {duration}, Received Trade ID: {trade_id}"
+                )  # Changed from print to logger.info
+                if not trade_id:  # Added check for falsy trade_id
+                    logger.warning(
+                        f"PocketOptionAPI returned a falsy trade_id: {trade_id}. This might indicate an issue."
+                    )
+                return trade_id
+            except Exception as e:
+                logger.error(
+                    f"Exception during place_trade ({asset}, {amount}, {direction}, {duration}): {e}",
+                    exc_info=True,
+                )  # Added exception logging
+                return None
         else:
-            print("Not connected to the broker API.")
+            logger.warning("Not connected to the broker API. Cannot place trade.")  # Changed from print to logger.warning
             return None
 
     def check_trade_result(self, trade_id):
         if self.connected:
-            result = self.account.check_win(trade_id)
-            return result
+            logger.info(f"Checking trade result for Trade ID: {trade_id}...")  # Added log
+            try:
+                result = self.account.check_win(trade_id)
+                logger.info(f"Trade result for ID {trade_id}: {result}")  # Added log
+                return result
+            except Exception as e:
+                logger.error(
+                    f"Exception during check_trade_result (Trade ID: {trade_id}): {e}",
+                    exc_info=True,
+                )  # Added exception logging
+                return None
         else:
-            print("Not connected to the broker API.")
+            logger.warning(
+                "Not connected to the broker API. Cannot check trade result."
+            )  # Changed from print to logger.warning
             return None
 
     def disconnect(self):
         if self.connected:
+            logger.info("Disconnecting from Pocket Option API...")  # Added log
             self.account.disconnect()
-            print("Disconnected from Pocket Option API.")
+            logger.info("Successfully disconnected from Pocket Option API.")  # Changed from print to logger.info
+            self.connected = False  # Explicitly set connected to False
