@@ -1,3 +1,10 @@
+# filepath: c:\\Users\\chris\\forex-feedback-engine\\tests\\test_broker_demo_trade.py
+# TODO (Next Steps for tomorrow - May 9, 2025):
+# 1. Verify 'pocketoptionapi' is installed in the Python environment (e.g., `pip install pocketoptionapi`).
+#    If not, the script will use a dummy API and trades won't reflect on Pocket Option.
+# 2. Ensure PO_SSID in .env is current and for your DEMO account on Pocket Option.
+# 3. Run this test script to confirm real trades can be placed and results checked.
+
 import time
 import logging
 import sys

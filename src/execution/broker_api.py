@@ -3,10 +3,13 @@ import logging  # Added
 # Get a specific logger for this module
 logger = logging.getLogger(__name__)  # Added
 
+# TODO: Ensure 'pocketoptionapi' is correctly installed in the environment.
+# If this import fails, the script will fall back to a dummy API and not connect to Pocket Option.
 try:
     from pocketoptionapi.stable_api import PocketOption
 except ImportError:
     # Dummy implementation for demo or testing without pocketoptionapi
+    logger.warning("Failed to import 'pocketoptionapi.stable_api'. Using DUMMY PocketOption class. REAL TRADES WILL NOT BE PLACED.") # Added warning
     class PocketOption:
         def __init__(self, ssid=None):
             pass

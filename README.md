@@ -111,3 +111,20 @@ Contributions are welcome! Please open an issue or pull request.
 ## License
 
 This project is licensed under the MIT License.
+
+## Next Steps / TODO (as of May 8, 2025)
+
+1.  **Resolve `pocketoptionapi` Installation:**
+    *   Ensure the `pocketoptionapi` library is correctly installed in the Python environment being used (e.g., `pip install pocketoptionapi`).
+    *   Verify that `from pocketoptionapi.stable_api import PocketOption` in `src/execution/broker_api.py` no longer causes an import error and that the script does not fall back to the dummy API implementation.
+2.  **Test Live Demo Trading:**
+    *   Obtain a fresh `PO_SSID` from your Pocket Option **demo account**.
+    *   Update the `PO_SSID` in the `.env` file.
+    *   Run `tests/test_broker_demo_trade.py` to confirm that trades are actually placed and visible on the Pocket Option demo platform.
+3.  **Refine Data Aggregation for LLM:**
+    *   Currently, the main loop fetches 1-minute data and then waits 60 seconds. The LLM is prompted for a 5-minute prediction.
+    *   Consider modifying the data fetching/aggregation logic to provide the LLM with more relevant data for a 5-minute prediction (e.g., the last 3-5 one-minute candles).
+4.  **Review OTC Feed Integration:**
+    *   The `otc_feed.py` is present but its data (`otc_candle`) isn't explicitly used in the `engine.get_decision` call in `main.py`. Determine if and how this data should be incorporated into the LLM prompt.
+5.  **Monitor Costs:**
+    *   Keep an eye on LLM API usage costs, especially if the polling frequency is increased or more complex prompts are used.
