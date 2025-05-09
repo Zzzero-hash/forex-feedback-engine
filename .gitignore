@@ -65,10 +65,12 @@ ehthumbs.db
 Desktop.ini
 
 # Ignore local config files containing sensitive credentials
-/src/config.py
+!src/config.py
 
 # Ignore environment variable files
+.env
 .env.*
+!.env.example
 
 # Ignore logs
 *.log
@@ -85,3 +87,17 @@ logs/
 # Ignore key and certificate files
 *.pem
 *.key
+
+# Add dotenv local override files
+.env.local
+.env.*.local
+
+# Python type check caches
+.mypy_cache/
+.pytype/
+
+# Dependency lock files
+Pipfile.lock
+
+# VS Code workspace files
+*.code-workspace
