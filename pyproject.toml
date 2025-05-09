@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "forex-feedback-engine"
+version = "0.1.0"
+description = "A Forex Feedback Engine for trading strategies."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" } # Feel free to change this
+authors = [
+  { name = "Your Name", email = "your.email@example.com" } # Update with your details
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License", # Adjust if you change the license
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+dependencies = [
+    "python-dotenv",
+    "requests",
+    "websockets",
+    "polygon-api-client",
+    "openai>=1.0.0",
+    "pandas",
+    "numpy",
+    "sqlalchemy",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-mock",
+    "pytest-asyncio",
+]
+dev = [
+    "forex-feedback-engine[test]", # Includes test dependencies
+    # You can add other development tools here, e.g.:
+    # "black",
+    # "ruff",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/yourusername/forex-feedback-engine" # Update placeholder
+"Repository" = "https://github.com/yourusername/forex-feedback-engine" # Update placeholder
+"Bug Tracker" = "https://github.com/yourusername/forex-feedback-engine/issues" # Update placeholder
+
+# If your src/main.py has a runnable main() function, you can expose it as a command-line script:
+# [project.entry-points."console_scripts"]
+# forex-engine = "src.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]  # Tells setuptools to find packages under the 'src' directory
+namespaces = false
+
+# To include non-Python files within your packages (e.g., templates, data files),
+# you can use package_data. Example:
+# [tool.setuptools.package-data]
+# your_package_name = ["*.json", "templates/*.html"]
