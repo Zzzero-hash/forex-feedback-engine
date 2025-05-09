@@ -46,6 +46,7 @@ class Config:
     loss_limit_pct = float(os.getenv("LOSS_LIMIT_PCT", 2.0))
     initial_balance = float(os.getenv("INITIAL_BALANCE", 1000.0))
     polygon_api_key = os.getenv("POLYGON_API_KEY")
+    max_consecutive_no_trade = int(os.getenv("MAX_CONSECUTIVE_NO_TRADE", 5)) # Max consecutive "NO TRADE" signals before switching pairs
 
     def __init__(self):
         logging.getLogger(__name__).debug(f"Config initialized with POLYGON_API_KEY={self.polygon_api_key}")

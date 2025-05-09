@@ -7,7 +7,7 @@ class FeedbackLoop:
         if database_url:
             from sqlalchemy import create_engine
             from sqlalchemy.orm import sessionmaker
-            from .models import Base, Trade
+            from .models import Base, Trade, SystemEvent
 
             self.engine = create_engine(database_url)
             Base.metadata.create_all(self.engine)
@@ -50,6 +50,21 @@ class FeedbackLoop:
             trade = Trade(decision=decision, outcome=outcome)
             self.session.add(trade)
             self.session.commit()
+
+    def record_system_event(self, event_type: str, symbol: str | None = None, details: str | None = None):
+        """Record a system event, such as a pair switch due to inactivity."""
+        if self.session:
+            from .models import SystemEvent
+            event = SystemEvent(
+                event_type=event_type,
+                symbol=symbol,
+                details=details
+            )
+            self.session.add(event)
+            self.session.commit()
+            print(f"System event logged: {event_type} - Symbol: {symbol} - Details: {details}")
+        else:
+            print(f"System event (not logged to DB): {event_type} - Symbol: {symbol} - Details: {details}")
 
     def calculate_win_rate(self):
         """Return the current win rate."""
