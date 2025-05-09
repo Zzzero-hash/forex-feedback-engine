@@ -47,6 +47,9 @@ class Config:
     initial_balance = float(os.getenv("INITIAL_BALANCE", 1000.0))
     polygon_api_key = os.getenv("POLYGON_API_KEY")
     max_consecutive_no_trade = int(os.getenv("MAX_CONSECUTIVE_NO_TRADE", 5)) # Max consecutive "NO TRADE" signals before switching pairs
+    pair_blacklist_duration_seconds = int(os.getenv("PAIR_BLACKLIST_DURATION_SECONDS", 3600)) # Duration to blacklist a pair after inactivity
+    max_consecutive_system_switches = int(os.getenv("MAX_CONSECUTIVE_SYSTEM_SWITCHES", 3)) # Max consecutive pair switches before system cooldown
+    system_cool_down_duration_seconds = int(os.getenv("SYSTEM_COOL_DOWN_DURATION_SECONDS", 1800)) # System cooldown duration
 
     def __init__(self):
         logging.getLogger(__name__).debug(f"Config initialized with POLYGON_API_KEY={self.polygon_api_key}")
