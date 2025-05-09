@@ -1,22 +1,28 @@
 from datetime import datetime
 import time
 import logging  # Added import
+import importlib
 
 # Get a logger for this module
 logger = logging.getLogger(__name__)  # Added logger
 
-try:
-    from polygon import RESTClient
-    logger.info("Successfully imported Polygon RESTClient.")  # Added log
-except ImportError:
-    RESTClient = None
-    logger.warning(
-        "Polygon RESTClient could not be imported. Polygon data feed will be unavailable."
-    )  # Added log
-
+# Dynamically attempt to import RESTClient from known Polygon packages
+RESTClient = None
+for pkg in ('polygon', 'polygon_api_client'):
+    try:
+        mod = importlib.import_module(pkg)
+        if hasattr(mod, 'RESTClient'):
+            RESTClient = getattr(mod, 'RESTClient')
+            logger.info(f"Imported Polygon RESTClient from '{pkg}' package.")
+            break
+    except ImportError as e:
+        logger.debug(f"Failed to import RESTClient from '{pkg}': {e}")
+if RESTClient is None:
+    logger.warning("Polygon RESTClient could not be imported from available packages. Polygon data feed will be unavailable.")
 
 class DataFeed:
     def __init__(self, api_key=None):
+        logger.debug(f"DataFeed __init__ called with api_key: {api_key}, RESTClient available: {bool(RESTClient)}")
         # Manage data sources
         self.data_sources = {}
         # Initialize Polygon.io RESTClient if available and API key provided

@@ -2,8 +2,6 @@ import os
 import time
 import logging
 import traceback # Added for detailed exception logging
-import numpy as np
-from datetime import datetime, timedelta
 
 # Get a specific logger for this module
 logger = logging.getLogger(__name__)
@@ -149,144 +147,22 @@ class LLMEngine:
         logger.warning(f"LLM response '{response_content}' did not contain CALL, PUT, or NO TRADE after cleaning. Defaulting to NO TRADE.")
         return "NO TRADE"
         
-    def _calculate_technical_indicators(self, data_feed, symbols):
+    def select_pair(self, symbols: list[str]):
         """
-        Calculate technical indicators for each symbol to support pair selection
-        
-        Args:
-            data_feed: DataFeed object to fetch price data
-            symbols: List of symbols to analyze
-            
-        Returns:
-            Dictionary with technical indicators for each symbol
-        """
-        logger.info("Calculating technical indicators for pair selection...")
-        market_data = {}
-        
-        for symbol in symbols:
-            try:
-                # Get historical data for this symbol (last 20 minutes = 4 x 5-min candles)
-                # In a real implementation, we would use actual historical data 
-                # This simulates candles with price and timestamp from current data
-                current_data = data_feed.get_quote(symbol)
-                if not current_data or 'price' not in current_data:
-                    logger.warning(f"Could not get price data for {symbol}, skipping")
-                    continue
-                
-                # Current price and timestamp
-                current_price = current_data.get('price', 0)
-                timestamp = current_data.get('timestamp')
-                
-                # Simulate some historical data for technical indicators
-                # This is a placeholder - in a real implementation we would fetch actual historical data
-                # Generate synthetic price history with small random changes
-                price_history = []
-                base_price = current_price
-                for i in range(10):  # Generate 10 historical price points
-                    # Create small random price variations (±0.5%)
-                    change = base_price * (1 + (np.random.random() - 0.5) * 0.005)
-                    price_history.append(change)
-                
-                # Calculate volatility (standard deviation of price changes)
-                if len(price_history) >= 2:
-                    price_changes = np.diff(price_history)
-                    volatility = float(np.std(price_changes))
-                else:
-                    volatility = 0.0
-                
-                # Calculate basic RSI (Relative Strength Index)
-                if len(price_history) >= 5:
-                    changes = np.diff(price_history)
-                    gains = np.sum(np.clip(changes, 0, None))
-                    losses = np.sum(np.abs(np.clip(changes, None, 0)))
-                    
-                    if losses == 0:
-                        rsi = 100.0
-                    else:
-                        rs = gains / losses if losses > 0 else 1.0
-                        rsi = 100.0 - (100.0 / (1.0 + rs))
-                else:
-                    rsi = 50.0  # Neutral value with insufficient data
-                
-                # Calculate momentum (difference between current price and 5 periods ago)
-                momentum = current_price - price_history[0] if price_history else 0
-                
-                # Calculate price change percentage
-                if price_history:
-                    price_change_pct = ((current_price - price_history[0]) / price_history[0]) * 100
-                else:
-                    price_change_pct = 0.0
-                
-                # Store calculated indicators
-                market_data[symbol] = {
-                    'price': current_price,
-                    'timestamp': timestamp,
-                    'volatility': volatility,
-                    'rsi': rsi,
-                    'momentum': momentum,
-                    'price_change_pct': price_change_pct,
-                }
-                
-                logger.debug(f"Technical indicators for {symbol}: {market_data[symbol]}")
-                
-            except Exception as e:
-                logger.error(f"Error calculating indicators for {symbol}: {e}")
-                continue
-        
-        return market_data
-                
-    def select_pair(self, symbols, data_feed=None):
-        """
-        Select the best trading pair among the provided symbols using the LLM and market data.
-        
-        Args:
-            symbols: List of symbol names to choose from
-            data_feed: Optional DataFeed object to get real-time market data
+        Select the best trading pair among the provided symbols using the LLM.
         """
         logger.info(f"Selecting trading pair from symbols: {symbols}")
         if not symbols:
             logger.error("No symbols provided to select_pair.")
             return None
             
-        market_data = {}
-        market_analysis = ""
-        
-        # Fetch market data if data_feed is available
-        if data_feed:
-            try:
-                market_data = self._calculate_technical_indicators(data_feed, symbols)
-                
-                # Format market data for LLM consumption
-                if market_data:
-                    market_analysis = "Current Market Data:\n"
-                    for symbol, data in market_data.items():
-                        market_analysis += f"{symbol}:\n"
-                        market_analysis += f"  Price: {data.get('price', 'N/A')}\n"
-                        market_analysis += f"  RSI: {data.get('rsi', 'N/A'):.1f}\n"
-                        market_analysis += f"  Volatility: {data.get('volatility', 'N/A'):.6f}\n"
-                        market_analysis += f"  Momentum: {data.get('momentum', 'N/A'):.6f}\n"
-                        market_analysis += f"  Price Change %: {data.get('price_change_pct', 'N/A'):.2f}%\n"
-                    logger.debug(f"Market analysis data prepared: {market_analysis}")
-            except Exception as e:
-                logger.error(f"Error preparing market data: {e}")
-                market_analysis = ""
-        
         system_msg = (
-            "You are a professional trading expert selecting the best forex pair for a 5-minute binary options trade. "
-            "Analyze the technical indicators and market data to identify the pair with the strongest directional "
-            "signal (up or down). Consider volatility, momentum, RSI, and recent price movements. "
-            "For binary options trading, look for pairs with clear trends, overbought/oversold RSI conditions, "
-            "or significant momentum that suggest a high-probability move within the next 5 minutes. "
+            "You are a professional trading expert. "
+            "Choose the single best trading pair to trade next from the following list of symbols. "
             "IMPORTANT: Respond with ONLY the exact symbol name. For example, if EURUSD is the best choice, "
             "respond with just 'EURUSD' and nothing else."
         )
-        
-        user_content = f"Available symbols: {symbols}\n\n"
-        if market_analysis:
-            user_content += market_analysis
-        else:
-            user_content += "No technical data available. Please select based on general forex market knowledge."
-            
+        user_content = f"Available symbols: {symbols}"
         max_retries = 3
         backoff = 1
         api_timeout_seconds = 30 # Define a timeout for the API call

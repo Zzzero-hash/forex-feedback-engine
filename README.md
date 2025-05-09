@@ -1,6 +1,6 @@
 # Feedback Loop Trading System
 
-This project is a feedback-loop driven trading system designed for binary options trading. It integrates real-time market data sources (e.g., Pocket Option OTC feed) and uses an LLM-based decision engine with configurable risk management.
+This project is a feedback-loop driven trading system designed for binary options trading. It integrates real-time market data sources, uses an LLM-based decision engine with configurable risk management, and now features enhanced market analysis with technical indicators for better pair selection.
 
 ## Project Structure
 
@@ -25,6 +25,24 @@ feedback_loop_trading_app
 ├── requirements.txt            # Python dependencies
 └── .env.example                # Example environment variables
 ```
+
+## Features
+
+- **Signal-Only Mode**: System generates trading signals without executing real trades
+- **OpenAI Integration**: Uses o4-mini LLM model to make trading decisions
+- **Enhanced Pair Selection**: Uses real-time market data and technical indicators for better trading pair selection
+- **Technical Analysis**: Calculates RSI, volatility, momentum and price changes for more informed decisions
+- **Risk Management**: Configurable profit targets and loss limits
+- **Trade History**: Records trades for analysis and model feedback
+
+## Technical Indicators
+
+The system now analyzes multiple technical indicators to select the optimal trading pair:
+
+- **RSI (Relative Strength Index)**: Measures the momentum of price movements
+- **Volatility**: Calculates standard deviation of price changes
+- **Momentum**: Tracks the rate of price changes over time
+- **Price Change Percentage**: Monitors recent price movements
 
 ## Setup Instructions
 

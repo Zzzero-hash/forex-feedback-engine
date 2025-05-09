@@ -40,7 +40,7 @@ def test_get_decision_call(llm_engine):
     assert decision == "CALL"
     llm_engine.client.chat.completions.create.assert_called_once()
     call_args = llm_engine.client.chat.completions.create.call_args
-    assert call_args[1]['model'] == "gpt-3.5-turbo"
+    assert call_args[1]['model'] == "o4-mini"
     assert call_args[1]['messages'][0]['role'] == "system"
     assert call_args[1]['messages'][1]['role'] == "user"
     assert "Market Data: {'price': '1.1000'}" in call_args[1]['messages'][1]['content']
@@ -106,3 +106,73 @@ def test_prompt_generation_content(llm_engine):
     # Verify system prompt is also passed (optional, depends on how deep you want to test)
     system_message_content = kwargs['messages'][0]['content']
     assert len(system_message_content) > 0 # Basic check that it's not empty
+
+def test_select_pair_success(llm_engine):
+    symbols = ['EURUSD', 'GBPUSD', 'USDJPY']
+    
+    # The mock fixture response 'CALL' doesn't match any symbol,
+    # so our function will default to the first symbol
+    selected = llm_engine.select_pair(symbols)
+    assert selected == 'EURUSD'  # First symbol is returned as fallback
+    
+    # Verify that the client was called
+    llm_engine.client.chat.completions.create.assert_called_once()
+    call_args = llm_engine.client.chat.completions.create.call_args
+    assert call_args[1]['model'] == 'o4-mini'  # Updated to use o4-mini
+    msgs = call_args[1]['messages']
+    assert msgs[0]['role'] == 'system'
+    assert 'Available symbols' in msgs[1]['content']
+
+
+def test_select_pair_exception_fallback(llm_engine):
+    symbols = ['EURUSD', 'GBPUSD']
+    
+    # When all API calls fail, we should get the first symbol as fallback
+    with patch('src.decision.llm_engine.openai.ChatCompletion.create', side_effect=Exception('API error')):
+        selected = llm_engine.select_pair(symbols)
+        # Should fall back to the first symbol
+        assert selected == 'EURUSD'
+
+def test_select_pair_with_market_data(llm_engine):
+    """Test that the select_pair method uses technical indicators from data_feed when available."""
+    symbols = ['EURUSD', 'GBPUSD', 'USDJPY']
+    
+    # Create a mock data_feed object
+    mock_data_feed = MagicMock()
+    
+    # Configure mock data_feed to return sample market data
+    def mock_get_quote(symbol):
+        # Return different prices for different symbols
+        prices = {
+            'EURUSD': 1.0850,
+            'GBPUSD': 1.2750,
+            'USDJPY': 150.25
+        }
+        return {
+            'price': prices.get(symbol, 100.0),
+            'timestamp': '2025-05-09T10:00:00'
+        }
+    
+    mock_data_feed.get_quote = MagicMock(side_effect=mock_get_quote)
+    
+    # Configure LLM to return a specific symbol
+    mock_chat_completion = MagicMock()
+    mock_chat_completion.choices = [MagicMock(message=MagicMock(content="GBPUSD"))]
+    llm_engine.client.chat.completions.create.return_value = mock_chat_completion
+    
+    # Call select_pair with data_feed
+    selected = llm_engine.select_pair(symbols, mock_data_feed)
+    assert selected == 'GBPUSD'
+    
+    # Verify that data_feed.get_quote was called for each symbol
+    assert mock_data_feed.get_quote.call_count == len(symbols)
+    
+    # Verify that technical data was included in the prompt
+    call_args = llm_engine.client.chat.completions.create.call_args
+    user_message = call_args[1]['messages'][1]['content']
+    assert 'Current Market Data:' in user_message
+    
+    # Verify system message contains technical analysis guidance
+    system_message = call_args[1]['messages'][0]['content']
+    assert 'technical indicators' in system_message.lower()
+    assert 'directional signal' in system_message.lower()
