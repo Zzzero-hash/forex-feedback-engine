@@ -1,6 +1,6 @@
 # Feedback Loop Trading System
 
-This project is a feedback-loop driven trading system designed for binary options trading. It integrates real-time market data sources (e.g., Alpha Vantage, Pocket Option OTC feed) and uses an LLM-based decision engine with configurable risk management.
+This project is a feedback-loop driven trading system designed for binary options trading. It integrates real-time market data sources (e.g., Pocket Option OTC feed) and uses an LLM-based decision engine with configurable risk management.
 
 ## Project Structure
 
@@ -8,7 +8,7 @@ This project is a feedback-loop driven trading system designed for binary option
 feedback_loop_trading_app
 ├── src
 │   ├── data
-│   │   ├── data_feed.py        # Handles real-time market data (Alpha Vantage)
+│   │   ├── data_feed.py        # Handles real-time market data
 │   │   └── otc_feed.py         # Manages OTC data via PocketOption API
 │   ├── decision
 │   │   ├── llm_engine.py       # Interfaces with the LLM API for trading decisions
@@ -55,7 +55,7 @@ Set the following in your `.env` file:
 ```dotenv
 OPENAI_API_KEY=your_openai_api_key
 PO_SSID=your_pocket_option_session_id
-ALPHA_VANTAGE_API_KEY=your_alpha_vantage_api_key
+POLYGON_API_KEY=your_polygon_api_key 
 DATABASE_URL=sqlite:///trading_logs.db
 LOG_LEVEL=INFO
 INITIAL_BALANCE=1000.0       # Starting account balance for risk calculations

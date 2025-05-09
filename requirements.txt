@@ -1,7 +1,7 @@
 python-dotenv
 requests
 websockets
-alpha_vantage
+polygon-api-client
 openai>=1.0.0
 pandas
 sqlalchemy

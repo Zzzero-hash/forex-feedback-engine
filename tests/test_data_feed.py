@@ -20,13 +20,13 @@ class TestDataFeed(unittest.TestCase):
             self.data_feed.fetch_data('INVALID_SYMBOL')
 
     def test_data_source_integration(self):
-        self.data_feed.add_data_source('Alpha Vantage', 'YOUR_API_KEY')
-        self.assertIn('Alpha Vantage', self.data_feed.data_sources)
+        self.data_feed.add_data_source('Polygon', 'YOUR_API_KEY')
+        self.assertIn('Polygon', self.data_feed.data_sources)
 
     def test_remove_data_source(self):
-        self.data_feed.add_data_source('Alpha Vantage', 'YOUR_API_KEY')
-        self.data_feed.remove_data_source('Alpha Vantage')
-        self.assertNotIn('Alpha Vantage', self.data_feed.data_sources)
+        self.data_feed.add_data_source('Polygon', 'YOUR_API_KEY')
+        self.data_feed.remove_data_source('Polygon')
+        self.assertNotIn('Polygon', self.data_feed.data_sources)
 
 if __name__ == '__main__':
     unittest.main()

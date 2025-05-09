@@ -18,14 +18,26 @@ def run_session(cfg, data_feed, otc_feed, engine, broker_api, feedback_loop, max
         spot_quote  = data_feed.get_quote('EURUSD')
         otc_candle  = otc_feed.get_otc_candles('EURUSD', cfg.otc_interval)
 
+        # Log the current trade history before sending to LLM
+        logging.debug(f"MAIN_LOOP: Current feedback_loop.trade_history: {feedback_loop.trade_history}")
+
         # 2) Ask LLM for a decision
         decision = engine.get_decision(spot_quote, feedback_loop.trade_history)
+        logging.info(f"LLM decision: {decision}") # Added log to see the decision before trade execution
 
         # 3) Execute trade if valid CALL/PUT
-        if decision in ("CALL", "PUT"):
+        if decision == "CALL" or decision == "PUT": # Modified condition
+            logging.info(f"Executing trade based on LLM decision: {decision}") # Added log
             trade_id = broker_api.place_trade('EURUSD', cfg.trade_amount, decision, cfg.otc_interval)
-            outcome = broker_api.check_trade_result(trade_id)
-            feedback_loop.record_trade_outcome(decision, outcome)
+            if trade_id: # Ensure trade_id is not None (e.g. if broker API failed)
+                outcome = broker_api.check_trade_result(trade_id)
+                feedback_loop.record_trade_outcome(decision, outcome)
+            else:
+                logging.error("Failed to place trade, broker_api.place_trade returned None.")
+        elif decision == "NO TRADE":
+            logging.info("LLM decided NO TRADE. No trade will be placed.")
+        else:
+            logging.warning(f"LLM returned an unexpected decision: '{decision}'. No trade will be placed.")
 
         # Strategy adjustment
         feedback_loop.adjust_strategy()
@@ -39,7 +51,12 @@ def run_session(cfg, data_feed, otc_feed, engine, broker_api, feedback_loop, max
         # Stop after max_iterations if defined
         iteration += 1
         if max_iterations and iteration >= max_iterations:
+            logging.info(f"Reached max_iterations ({max_iterations}). Exiting session.") # Added log
             break
+
+        # Wait for a defined period before the next iteration to reduce LLM calls
+        logging.debug("MAIN_LOOP: Waiting for 60 seconds before next iteration...")
+        time.sleep(60) # Add a 60-second delay
 
     return feedback_loop.trade_history
 
@@ -53,12 +70,12 @@ def main():
     if not cfg.po_ssid:
         logging.error("Pocket Option SSID not set. Please set PO_SSID in your .env or environment variables.")
         return
-    if not cfg.alpha_vantage_api_key:
-        logging.error("Alpha Vantage API key not set. Please set ALPHA_VANTAGE_API_KEY in your .env or environment variables.")
+    if not cfg.polygon_api_key:
+        logging.error("Polygon.io API key not set. Please set POLYGON_API_KEY in your .env or environment variables.")
         return
     # Configure logging
     logging.basicConfig(level=cfg.log_level)
-    data_feed     = DataFeed(api_key=cfg.alpha_vantage_api_key)
+    data_feed     = DataFeed(api_key=cfg.polygon_api_key)
     otc_feed      = OTCFeed()
     engine        = LLMEngine(api_key=cfg.openai_api_key)
     broker_api    = BrokerAPI(ssid=cfg.po_ssid)
