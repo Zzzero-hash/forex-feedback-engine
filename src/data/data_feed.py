@@ -37,6 +37,12 @@ class DataFeed:
                 logger.warning(
                     "Polygon API key not provided. Polygon client not initialized."
                 )  # Added log
+                
+        # Define symbol types mapping
+        self.symbol_prefixes = {
+            'forex': 'C',     # Currency/Forex uses 'C:' prefix
+            'crypto': 'X',    # Crypto uses 'X:' prefix
+        }
 
     def add_data_source(self, name, key):
         self.data_sources[name] = key
@@ -44,28 +50,75 @@ class DataFeed:
     def remove_data_source(self, name):
         if name in self.data_sources:
             del self.data_sources[name]
+            
+    def detect_symbol_type(self, symbol):
+        """
+        Detect if a symbol is forex or crypto based on convention.
+        
+        Args:
+            symbol: Symbol string (e.g., 'EURUSD' for forex or 'BTCUSD' for crypto)
+            
+        Returns:
+            Symbol type ('forex' or 'crypto')
+        """
+        # Common crypto symbols that we want to treat as crypto regardless of format
+        crypto_symbols = ['BTC', 'ETH', 'SOL', 'XRP', 'ADA', 'DOT']
+        
+        # Check if the first three characters match any known crypto symbol
+        if any(symbol.startswith(crypto) for crypto in crypto_symbols):
+            return 'crypto'
+            
+        # Default to forex for 6-character symbols that don't match crypto patterns
+        return 'forex'
+        
+    def get_polygon_ticker(self, symbol):
+        """
+        Convert a symbol to the proper Polygon API ticker format.
+        
+        Args:
+            symbol: Symbol string (e.g., 'EURUSD', 'BTCUSD')
+            
+        Returns:
+            Properly formatted ticker for Polygon API (e.g., 'C:EURUSD', 'X:BTCUSD')
+        """
+        symbol_type = self.detect_symbol_type(symbol)
+        prefix = self.symbol_prefixes.get(symbol_type, 'C')  # Default to forex (C) if type unknown
+        return f"{prefix}:{symbol}"
 
     def fetch_data(self, symbol):
         logger.debug(f"fetch_data called with symbol: {symbol}")  # Added log
-        # Symbol must be 6-character currency pair, e.g. \'EURUSD\'
-        if not isinstance(symbol, str) or len(symbol) != 6:
+        # Validate symbol format: must be 6-letter alphabetic (e.g., 'EURUSD', 'BTCUSD')
+        if not isinstance(symbol, str) or len(symbol) != 6 or not symbol.isalpha():
             logger.error(f"Invalid symbol format: {symbol}")  # Added log
             raise ValueError(f"Invalid symbol: {symbol}")
         # Use Polygon.io RESTClient when available
         if self.client:
-            # Polygon expects e.g. \'C:EURUSD\'
-            pair = f"C:{symbol}"
+            # Detect symbol type and format for Polygon
+            pair = self.get_polygon_ticker(symbol)
             logger.debug(f"Attempting to fetch data for Polygon pair: {pair}")  # Added log
-            # Get last minute bar (1-min granularity)
+            
             try:
-                # Polygon.io API requires a 'from' and 'to' timestamp for aggregates.
-                # Let's fetch for the last few minutes to ensure we get data.
-                # The API expects timestamps in milliseconds.
-                to_ts = int(time.time() * 1000)
-                from_ts = int((time.time() - (5 * 60)) * 1000)  # 5 minutes ago
+                # Use yesterday and 5 minutes back to avoid weekend/future data issues
+                # The API expects timestamps in milliseconds
+                now = datetime.now()
+                
+                # For crypto, we can use more recent data since it trades 24/7
+                if pair.startswith('X:'):  # Crypto
+                    to_ts = int(time.time() * 1000)
+                    from_ts = int((time.time() - (5 * 60)) * 1000)  # 5 minutes ago
+                else:  # Forex - might need to go further back on weekends
+                    if now.weekday() >= 5:  # Weekend (5=Saturday, 6=Sunday)
+                        # Go back to Friday's data
+                        days_to_friday = (now.weekday() - 4) % 7  # 5->1, 6->2
+                        to_ts = int((time.time() - (days_to_friday * 24 * 60 * 60)) * 1000)
+                        from_ts = int(to_ts - (5 * 60 * 1000))  # 5 minutes before 
+                    else:
+                        # Normal weekday
+                        to_ts = int(time.time() * 1000)
+                        from_ts = int((time.time() - (5 * 60)) * 1000)  # 5 minutes ago
 
                 logger.debug(
-                    f"Polygon API call: get_aggs(ticker={pair}, multiplier=1, timespan=\'minute\', from_={from_ts}, to={to_ts}, limit=1)"
+                    f"Polygon API call: get_aggs(ticker={pair}, multiplier=1, timespan='minute', from_={from_ts}, to={to_ts}, limit=1)"
                 )
                 bars = self.client.get_aggs(
                     ticker=pair, multiplier=1, timespan="minute", from_=from_ts, to=to_ts, limit=1

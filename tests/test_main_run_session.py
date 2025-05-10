@@ -50,6 +50,11 @@ def make_cfg():
     cfg.profit_target_pct = 5
     cfg.loss_limit_pct = 2
     cfg.enable_demo_mode = True  # Add this for signal-only mode
+    # Add other config parameters needed for run_session
+    cfg.max_consecutive_no_trade = 5
+    cfg.pair_blacklist_duration_seconds = 300
+    cfg.max_consecutive_system_switches = 3
+    cfg.system_cool_down_duration_seconds = 60
     return cfg
 
 @pytest.mark.parametrize("decisions,outcomes,expected_trades", [
@@ -67,7 +72,10 @@ def test_run_session_stops_on_risk(decisions, outcomes, expected_trades):
     engine = DummyEngine(decisions)
     broker = DummyBroker(outcomes)
     feedback = pytest.importorskip('src.feedback.feedback_loop').FeedbackLoop()
-    trades = run_session(cfg, data_feed, otc_feed, engine, broker, feedback, max_iterations=3)  # Set a small max_iterations value
+    # Add symbols_list and initial_symbol_idx arguments for compatibility with new run_session signature
+    symbols_list = ["TEST_SYMBOL"]
+    initial_symbol_idx = 0
+    trades = run_session(cfg, data_feed, otc_feed, engine, broker, feedback, symbols_list, initial_symbol_idx, max_iterations=3)  # Set a small max_iterations value
     assert len(trades) == expected_trades
 
 def test_run_session_max_iterations():
@@ -78,7 +86,10 @@ def test_run_session_max_iterations():
     engine = DummyEngine(['NO TRADE', 'NO TRADE', 'NO TRADE'])
     broker = DummyBroker([])
     feedback = pytest.importorskip('src.feedback.feedback_loop').FeedbackLoop()
-    trades = run_session(cfg, data_feed, otc_feed, engine, broker, feedback, max_iterations=3)
+    # Add symbols_list and initial_symbol_idx arguments for compatibility with new run_session signature
+    symbols_list = ["TEST_SYMBOL"]
+    initial_symbol_idx = 0
+    trades = run_session(cfg, data_feed, otc_feed, engine, broker, feedback, symbols_list, initial_symbol_idx, max_iterations=3)
     # No trades executed
     assert trades == []
     # After 3 iterations it stops

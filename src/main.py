@@ -1,12 +1,9 @@
 import time
 import logging
+import datetime
 from .data.data_feed import DataFeed
 from .data.otc_feed import OTCFeed
 from .decision.llm_engine_temporal import TemporalLLMEngine
-# Bring in core components for main
-from .config import Config
-from .execution.broker_api import BrokerAPI
-from .feedback.feedback_loop import FeedbackLoop
 # Alias legacy LLMEngine name for backward compatibility and tests
 LLMEngine = TemporalLLMEngine
 
@@ -207,29 +204,47 @@ def main():
     # Configure logging
     logging.basicConfig(level=cfg.log_level)
     # Ensure required API keys are provided
+    # Warn if API keys are missing, but continue for testing or fallback
     if not cfg.openai_api_key:
-        logging.error("OpenAI API key not set. Please set OPENAI_API_KEY in your .env or environment variables.")
-        return
+        logging.warning("OpenAI API key not set. Proceeding without real OpenAI API calls.")
     if not cfg.po_ssid:
-        logging.error("Pocket Option SSID not set. Please set PO_SSID in your .env or environment variables.")
-        return
+        logging.warning("Pocket Option SSID not set. Proceeding without real broker API calls.")
     if not cfg.polygon_api_key:
-        logging.error("Polygon.io API key not set. Please set POLYGON_API_KEY in your .env or environment variables.")
-        return
+        logging.warning("Polygon.io API key not set. Proceeding without real market data.")
+        
     data_feed     = DataFeed(api_key=cfg.polygon_api_key)
     otc_feed      = OTCFeed()
     # Initialize temporal LLM engine with historical context
-    engine        = TemporalLLMEngine(api_key=cfg.openai_api_key)
+    engine        = LLMEngine(api_key=cfg.openai_api_key)
     engine.initialize_historical_collector(data_feed, lookback_periods=20, timeframe_minutes=5)
     broker_api    = BrokerAPI(ssid=cfg.po_ssid)
     feedback_loop = FeedbackLoop(database_url=cfg.database_url)
+    
     # Retrieve OTC symbols from feed
     raw_symbols = otc_feed.get_otc_symbols()
+    
     # raw_symbols may be a dict or list; convert to list
     if not raw_symbols:
-        logging.error("No OTC symbols retrieved from OTCFeed. Exiting.")
-        return
-    symbols = list(raw_symbols.keys() if isinstance(raw_symbols, dict) else raw_symbols)
+        logging.warning("No OTC symbols retrieved from OTCFeed. Using default symbols.")
+        forex_symbols = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD"]
+    else:
+        forex_symbols = list(raw_symbols.keys() if isinstance(raw_symbols, dict) else raw_symbols)
+    
+    # Add cryptocurrency symbols for weekend trading
+    # These popular crypto pairs should be available 24/7 on Polygon
+    crypto_symbols = ["BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "ADAUSD"]
+    
+    # Detect if it's weekend to prioritize crypto symbols
+    now = datetime.datetime.now()
+    is_weekend = now.weekday() >= 5  # 5=Saturday, 6=Sunday
+    
+    if is_weekend:
+        logging.info("Weekend detected: Prioritizing cryptocurrency symbols that trade 24/7")
+        # Use crypto first, then forex as fallback
+        symbols = crypto_symbols + forex_symbols
+    else:
+        # Use all available symbols, forex first
+        symbols = forex_symbols + crypto_symbols
     
     logging.info(f"Available symbols: {symbols}")
 

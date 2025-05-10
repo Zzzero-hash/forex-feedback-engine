@@ -13,25 +13,44 @@ logger = logging.getLogger(__name__)
 # Try to import the OpenAI library and determine its version
 try:
     import openai
+    
+    # Check OpenAI version number without using pkg_resources
+    OPENAI_V1 = False
     try:
-        # Check if we're using OpenAI v1.x (newer)
-        from openai import OpenAI
-        OPENAI_V1 = True
-        logger.info("Using OpenAI v1.x API")
+        # Get version directly from the module if possible
+        if hasattr(openai, "__version__"):
+            openai_version = openai.__version__
+            # If version starts with 1.x, we're using v1 API
+            OPENAI_V1 = openai_version.startswith("1.")
+            logger.info(f"OpenAI version detected: {openai_version}")
+        
+        # Try v1.x imports
+        if hasattr(openai, "OpenAI"):
+            from openai import OpenAI
+            OPENAI_V1 = True
+            logger.info("Using OpenAI v1.x API based on module structure")
+            
+            # Define error classes for consistency
+            try:
+                from openai.types.error import RateLimitError
+            except ImportError:
+                class RateLimitError(Exception): # type: ignore
+                    pass
+        else:
+            # v0.x client imports
+            logger.info("Using OpenAI v0.x API based on module structure")
+            try:
+                from openai.error import RateLimitError # type: ignore
+            except ImportError:
+                class RateLimitError(Exception): # type: ignore
+                    pass
+    except Exception as e:
+        logger.warning(f"Error detecting OpenAI version: {e}. Will attempt compatibility logic.")
         try:
-            from openai import RateLimitError
+            from openai import OpenAI  # This will work for v1.x
+            OPENAI_V1 = True
         except ImportError:
-            class RateLimitError(Exception): # type: ignore
-                pass
-    except ImportError:
-        # We're using OpenAI v0.x (older)
-        OPENAI_V1 = False
-        logger.info("Using OpenAI v0.x API")
-        try:
-            from openai.error import RateLimitError # type: ignore
-        except ImportError:
-            class RateLimitError(Exception): # type: ignore
-                pass
+            OPENAI_V1 = False
 except ImportError:
     logger.error("OpenAI library not installed. Run 'pip install openai'")
     raise ImportError("OpenAI library not installed. Run 'pip install openai'")
@@ -40,16 +59,27 @@ class TemporalLLMEngine:
     def __init__(self, api_key, prompt_config=None, model="o4-mini"):
         self.api_key = api_key
         self.model = model
+        self.client = None
         
         # Corrected f-string and use module-specific logger
         logger.info(f"API key provided: {'Yes' if self.api_key else 'No'}")
         
+        # Initialize OpenAI client based on detected version
         if 'OPENAI_V1' in globals() and OPENAI_V1:
-            self.client = OpenAI(api_key=self.api_key)
-            logger.info(f"OpenAI version: {openai.__version__}")
+            try:
+                # For v1.x API
+                self.client = OpenAI(api_key=self.api_key)
+                logger.info(f"Initialized OpenAI v1.x client with model: {self.model}")
+            except Exception as e:
+                logger.error(f"Failed to initialize OpenAI v1.x client: {e}")
+                # We'll fall back to calling the API directly in _call_openai_api
         else:
-            openai.api_key = self.api_key # type: ignore
-            logger.info(f"OpenAI version: {openai.__version__}") # type: ignore
+            # For v0.x API
+            try:
+                openai.api_key = self.api_key # type: ignore
+                logger.info(f"Initialized OpenAI v0.x with model: {self.model}")
+            except Exception as e:
+                logger.error(f"Failed to set OpenAI v0.x API key: {e}")
             
         from .temporal_prompt_config import TemporalPromptConfig
         self.prompt_config = prompt_config or TemporalPromptConfig()
@@ -186,11 +216,15 @@ class TemporalLLMEngine:
         return summary
     
     def _call_openai_api(self, system_msg, user_content):
-        """Call the OpenAI API with retry logic"""
+        """Call the OpenAI API with retry logic and proper fallbacks"""
         max_retries = 3
         backoff = 1
-        response = None
         api_timeout_seconds = 30
+        
+        # Create a dummy response simulation for when API fails
+        def create_dummy_response():
+            logger.warning(f"Using fallback dummy response due to API issues")
+            return "Based on the provided market data and technical indicators, there isn't enough information to make a confident prediction. The price action is unclear and there are no strong signals in either direction. NO TRADE"
         
         for attempt in range(max_retries):
             try:
@@ -199,34 +233,59 @@ class TemporalLLMEngine:
                 # Use the configured model
                 current_model_to_use = self.model
                 
-                # Try the v1.x client interface first
-                if 'OPENAI_V1' in globals() and OPENAI_V1:
+                response = None
+                content = None
+                
+                # Use the appropriate API based on version
+                if 'OPENAI_V1' in globals() and OPENAI_V1 and self.client:
                     try:
+                        # Clean v1.x API call with proper error handling
                         response = self.client.chat.completions.create(
                             model=current_model_to_use,
                             messages=[
                                 {"role": "system", "content": system_msg},
                                 {"role": "user", "content": user_content}
                             ],
-                            timeout=api_timeout_seconds
+                            max_tokens=500,
+                            temperature=0.7
                         )
+                        if hasattr(response, 'choices') and len(response.choices) > 0:
+                            content = response.choices[0].message.content
+                            logger.debug("Successfully called OpenAI v1.x API")
+                            break
                     except Exception as e:
-                        logger.error(f"Error with v1 API: {e}")
-                        response = None
+                        logger.error(f"Error with OpenAI v1.x API call: {str(e)}")
+                        # Continue to fallback methods
                 
-                # Fallback to legacy interface
-                if response is None:
-                    response = openai.ChatCompletion.create(
-                        model=current_model_to_use,
-                        messages=[
-                            {"role": "system", "content": system_msg},
-                            {"role": "user", "content": user_content}
-                        ],
-                        request_timeout=api_timeout_seconds
-                    )
+                # Try the legacy v0.x API if v1.x failed
+                if not content:
+                    try:
+                        # For v0.x API
+                        response = openai.ChatCompletion.create( # type: ignore
+                            model=current_model_to_use,
+                            messages=[
+                                {"role": "system", "content": system_msg},
+                                {"role": "user", "content": user_content}
+                            ],
+                            max_tokens=500,
+                            temperature=0.7,
+                            request_timeout=api_timeout_seconds
+                        )
+                        if hasattr(response, 'choices') and len(response.choices) > 0:
+                            content = response.choices[0].message['content']
+                            logger.debug("Successfully called OpenAI v0.x API")
+                            break
+                    except Exception as e:
+                        logger.error(f"Error with OpenAI v0.x API call: {str(e)}")
                 
-                if response and hasattr(response, 'choices') and response.choices:
-                    break
+                # If we reached here without a response, retry or use fallback
+                if not content and attempt == max_retries - 1:
+                    # Last attempt failed, use fallback
+                    content = create_dummy_response()
+                elif not content:
+                    # Retry with backoff
+                    time.sleep(backoff)
+                    backoff *= 2
                 
             except RateLimitError:
                 logger.warning(f"OpenAI rate limit hit on attempt {attempt + 1}/{max_retries}")
@@ -243,15 +302,15 @@ class TemporalLLMEngine:
                     backoff *= 2
                 else:
                     logger.error("Failed to call OpenAI API after all retries")
-                    return "NO TRADE"
+                    return self._parse_response(create_dummy_response())
         
-        if not response or not hasattr(response, 'choices') or not response.choices:
-            logger.error("Invalid or empty response from OpenAI API")
+        # Parse the response
+        if content:
+            logger.debug(f"LLM decision raw content: '{content}'")
+            return self._parse_response(content)
+        else:
+            logger.error("No response content from OpenAI API")
             return "NO TRADE"
-        
-        content = response.choices[0].message.content
-        logger.debug(f"LLM decision raw content: '{content}'")
-        return self._parse_response(content)
     
     def _parse_response(self, response_content):
         """Parse the LLM response to extract the decision"""
