@@ -84,6 +84,7 @@ To run the trading system:
    - `DATABASE_URL` (Optional): SQLAlchemy connection string for storing trade history (e.g., `sqlite:///trading_logs.db`). Defaults to an in-memory SQLite database if not set.
    - `ENABLE_DEMO_MODE` (Optional): Set to `true` to run in signal-only mode, even if `PO_SSID` is provided. Defaults to `false`.
    - `LOG_LEVEL` (Optional): Set the logging level (e.g., `DEBUG`, `INFO`, `WARNING`). Defaults to `INFO`.
+   - `LLM_MODEL` (Optional): Specify the LLM model to be used (e.g., `o4-mini`, `gpt-3.5-turbo`). Defaults to `o4-mini`.
 
    Example for PowerShell:
 
