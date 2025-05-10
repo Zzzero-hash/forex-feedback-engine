@@ -6,28 +6,26 @@ def mock_components():
     """Create mock components for testing main.py"""
     with patch('src.main.DataFeed') as mock_data_feed, \
          patch('src.main.OTCFeed') as mock_otc_feed, \
-         patch('src.main.LLMEngine') as mock_engine, \
+         patch('src.main.LLMEngine') as mock_llm_engine_class, \  # Changed patch target
          patch('src.main.BrokerAPI') as mock_broker, \
          patch('src.main.FeedbackLoop') as mock_feedback, \
          patch('src.main.Config') as mock_config, \
          patch('src.main.run_session') as mock_run_session:
         
-        # Configure mocks
         mock_config.return_value.openai_api_key = "test_key"
         mock_config.return_value.po_ssid = "test_ssid"
         mock_config.return_value.polygon_api_key = "test_polygon"
         mock_config.return_value.log_level = "INFO"
         
-        # Set up OTCFeed to return symbols
         mock_otc_feed.return_value.get_otc_symbols.return_value = ["EURUSD", "GBPUSD", "USDJPY"]
         
-        # Set up engine to select a pair
-        mock_engine.return_value.select_pair.return_value = "EURUSD"
+        # Configure the select_pair method on the instance that the mocked class will return
+        mock_llm_engine_class.return_value.select_pair.return_value = "EURUSD"
         
         yield {
             'data_feed': mock_data_feed,
             'otc_feed': mock_otc_feed,
-            'engine': mock_engine,
+            'engine_class_mock': mock_llm_engine_class, # This now refers to the mock of src.main.LLMEngine
             'broker': mock_broker,
             'feedback': mock_feedback,
             'config': mock_config,
@@ -36,26 +34,33 @@ def mock_components():
 
 def test_main_passes_data_feed_to_select_pair(mock_components):
     """Test that main passes the data_feed to the select_pair method"""
-    # Import main here to use the mocked components
+    
+    import src.main
+
+    # Assert that src.main.LLMEngine is indeed our mocked class
+    assert src.main.LLMEngine is mock_components['engine_class_mock'], \
+        "src.main.LLMEngine was not replaced by the mock class"
+
     from src.main import main
     
-    # Call the main function
     main()
     
-    # Check that select_pair was called with both symbols and data_feed
-    mock_engine_instance = mock_components['engine'].return_value
-    select_pair_call = mock_engine_instance.select_pair
+    mock_engine_instance = mock_components['engine_class_mock'].return_value
+    select_pair_method_mock = mock_engine_instance.select_pair
     
-    # First argument should be the symbols list
-    args, kwargs = select_pair_call.call_args
+    assert select_pair_method_mock.called, \
+        "select_pair was not called on the mocked engine instance"
+    
+    args, kwargs = select_pair_method_mock.call_args
+    
     assert len(args) >= 1
     assert isinstance(args[0], list)  # First arg should be symbols list
     
-    # Second argument should be the data_feed
     assert len(args) >= 2
-    assert args[1] == mock_components['data_feed'].return_value  # Second arg should be data_feed
+    assert args[1] is mock_components['data_feed'].return_value
     
-    # Check that run_session is called with the selected pair
     mock_run_session_call = mock_components['run_session']
-    run_session_kwargs = mock_run_session_call.call_args[1]
-    assert run_session_kwargs['symbol'] == 'EURUSD'
+    assert mock_run_session_call.called, "run_session was not called"
+    
+    run_session_pos_args, run_session_kw_args = mock_run_session_call.call_args
+    assert run_session_kw_args.get('symbol') == "EURUSD"

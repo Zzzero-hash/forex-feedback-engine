@@ -35,6 +35,7 @@ dependencies = [
     "pandas",
     "numpy",
     "sqlalchemy",
+    "pandas_ta",  # Added for comprehensive technical indicators and pattern detection
 ]
 
 [project.optional-dependencies]

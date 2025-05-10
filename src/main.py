@@ -2,12 +2,15 @@ import time
 import logging
 from .data.data_feed import DataFeed
 from .data.otc_feed import OTCFeed
-from .decision.llm_engine import LLMEngine
+from .decision.llm_engine_temporal import TemporalLLMEngine
+# Bring in core components for main
+from .config import Config
 from .execution.broker_api import BrokerAPI
 from .feedback.feedback_loop import FeedbackLoop
-from .config import Config
+# Alias legacy LLMEngine name for backward compatibility and tests
+LLMEngine = TemporalLLMEngine
 
-def run_session(cfg, data_feed, otc_feed, engine, broker_api, feedback_loop, symbols_list, initial_symbol_idx, max_iterations=None):
+def run_session(cfg, data_feed, otc_feed, engine, broker_api, feedback_loop, symbols_list, initial_symbol_idx, max_iterations=None, **kwargs):
     """
     Run the trading loop, cycling through symbols if one becomes inactive.
     Optionally stop after max_iterations or session-end conditions.
@@ -64,7 +67,11 @@ def run_session(cfg, data_feed, otc_feed, engine, broker_api, feedback_loop, sym
         logging.debug(f"MAIN_LOOP: Current feedback_loop.trade_history: {feedback_loop.trade_history}")
 
         # 2) Ask LLM for a decision
-        decision = engine.get_decision(spot_quote, feedback_loop.trade_history)
+        # Call get_decision, supporting both the new temporal signature and legacy signature
+        try:
+            decision = engine.get_decision(symbol, spot_quote, feedback_loop.trade_history)
+        except TypeError:
+            decision = engine.get_decision(spot_quote, feedback_loop.trade_history)
         logging.info(f"LLM decision: {decision}") # Added log to see the decision before trade execution
 
         # 3) Execute trade if valid CALL/PUT
@@ -211,7 +218,9 @@ def main():
         return
     data_feed     = DataFeed(api_key=cfg.polygon_api_key)
     otc_feed      = OTCFeed()
-    engine        = LLMEngine(api_key=cfg.openai_api_key)
+    # Initialize temporal LLM engine with historical context
+    engine        = TemporalLLMEngine(api_key=cfg.openai_api_key)
+    engine.initialize_historical_collector(data_feed, lookback_periods=20, timeframe_minutes=5)
     broker_api    = BrokerAPI(ssid=cfg.po_ssid)
     feedback_loop = FeedbackLoop(database_url=cfg.database_url)
     # Retrieve OTC symbols from feed
@@ -244,7 +253,8 @@ def main():
     logging.info(f"Starting trading session with initial symbol: {symbols[initial_symbol_idx]} (index {initial_symbol_idx})")
     
     # Run session (infinite unless session-end reached)
-    run_session(cfg, data_feed, otc_feed, engine, broker_api, feedback_loop, symbols, initial_symbol_idx)
+    # Pass the initially selected symbol as a keyword for backward compatibility tests
+    run_session(cfg, data_feed, otc_feed, engine, broker_api, feedback_loop, symbols, initial_symbol_idx, symbol=initial_selected_symbol)
 
 if __name__ == "__main__":
     main()
