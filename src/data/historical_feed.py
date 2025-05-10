@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Tuple
 import pandas as pd
 
+logger = logging.getLogger(__name__) # Define logger at module scope first
+
 # Attempt optional import of pandas_ta for indicators
 try:
     import pandas_ta as ta  # type: ignore
@@ -12,10 +14,7 @@ try:
 except ImportError:
     ta = None
     TA_AVAILABLE = False
-    logger = logging.getLogger(__name__)
-    logger.warning("pandas_ta not installed; advanced indicators and pattern detection disabled.")
-
-logger = logging.getLogger(__name__)
+    logger.warning("pandas_ta not installed; advanced indicators and pattern detection disabled.") # Uses module logger
 
 class HistoricalDataCollector:
     """
@@ -44,81 +43,115 @@ class HistoricalDataCollector:
                    f"timeframe_minutes={timeframe_minutes}")
     
     def _fetch_historical_data_from_polygon(self, symbol: str) -> Optional[pd.DataFrame]:
-        """Fetch historical price data from Polygon API."""
+        """Fetch historical price data from Polygon API, trying multiple past windows if necessary."""
         if not self.data_feed or not self.data_feed.client:
             logger.warning("No Polygon client available for historical data")
             return None
+
+        now_fixed = datetime.now()
+        collected_data_frames: List[pd.DataFrame] = []
+        max_attempts = 3  # Try up to 3 historical windows (e.g., 3 weeks back)
+        api_request_limit = 1000  # Max bars to request per API call
+        
+        # Determine the end and start of the *most recent* 7-day window first
+        # This logic considers if the symbol is crypto or forex, and if it's a weekend for forex
+        is_crypto = self.data_feed.detect_symbol_type(symbol) == 'crypto'
+        
+        base_end_datetime_for_logic = now_fixed - timedelta(hours=1) # General end point: 1 hour ago from current time
+
+        if is_crypto:
+            initial_window_end_dt = base_end_datetime_for_logic
+        else: # Forex
+            # If 'now_fixed' is a weekend, the most recent data window should end on the preceding Friday.
+            if now_fixed.weekday() >= 5: # 5=Saturday, 6=Sunday
+                days_to_friday = (now_fixed.weekday() - 4) % 7
+                initial_window_end_dt = now_fixed - timedelta(days=days_to_friday, hours=1)
+            else: # It's a weekday
+                initial_window_end_dt = base_end_datetime_for_logic
+        
+        initial_window_start_dt = initial_window_end_dt - timedelta(days=7)
+
+        for attempt in range(max_attempts):
+            # Shift the window for the current attempt
+            # For attempt 0, it uses the initial_window_start_dt and initial_window_end_dt
+            # For subsequent attempts, it shifts this window further into the past
+            current_attempt_end_dt = initial_window_end_dt - timedelta(days=attempt * 7)
+            current_attempt_start_dt = initial_window_start_dt - timedelta(days=attempt * 7)
+
+            end_date_str = current_attempt_end_dt.strftime('%Y-%m-%d')
+            start_date_str = current_attempt_start_dt.strftime('%Y-%m-%d')
             
-        try:
-            now = datetime.now()
-            
-            # Check if the symbol is crypto (trades 24/7) or forex (weekday trading)
-            is_crypto = self.data_feed.detect_symbol_type(symbol) == 'crypto'
-            is_weekend = now.weekday() >= 5  # 5=Saturday, 6=Sunday
-            
-            # For crypto, we can use more recent data on any day since it trades 24/7
-            # For forex on weekends, we need to use data from previous trading day
-            if is_crypto:
-                # Crypto: use recent data (yesterday to ensure complete bars)
-                end_datetime = now - timedelta(hours=1)  # 1 hour ago to ensure complete data
-                start_datetime = end_datetime - timedelta(days=3)  # 3 days of data
-                logger.info(f"Using crypto historical data for {symbol} (trades 24/7)")
-            elif is_weekend:
-                # Forex on weekend: use Friday's data
-                days_to_friday = (now.weekday() - 4) % 7  # 5->1, 6->2 days back to Friday
-                end_datetime = now - timedelta(days=days_to_friday, hours=1)  # Friday - safety margin
-                start_datetime = end_datetime - timedelta(days=5)  # 5 days before that
-                logger.info(f"Weekend detected for forex {symbol}. Using data from {start_datetime.strftime('%Y-%m-%d')} to {end_datetime.strftime('%Y-%m-%d')}")
-            else:
-                # Normal weekday for forex
-                end_datetime = now - timedelta(hours=1)  # 1 hour ago to ensure complete data
-                start_datetime = end_datetime - timedelta(days=5)  # 5 days of data
-                logger.info(f"Using weekday forex historical data for {symbol}")
-            
-            # Convert to string format YYYY-MM-DD that Polygon expects
-            end_date_str = end_datetime.strftime('%Y-%m-%d')
-            start_date_str = start_datetime.strftime('%Y-%m-%d')
-            
-            # Get proper ticker format for the symbol
             polygon_symbol = self.data_feed.get_polygon_ticker(symbol)
             
-            logger.info(f"Fetching historical data for {symbol} as {polygon_symbol} from {start_date_str} to {end_date_str}")
+            logger.info(f"Fetching historical data batch {attempt + 1}/{max_attempts} for {symbol} ({polygon_symbol}) "
+                        f"from {start_date_str} to {end_date_str}, API limit {api_request_limit}")
             
-            # Call Polygon API for aggregated data using proper date strings
-            bars = self.data_feed.client.get_aggs(
-                ticker=polygon_symbol,
-                multiplier=self.timeframe_minutes,
-                timespan="minute",
-                from_=start_date_str,  # Use the string date format for better reliability
-                to=end_date_str,       # Use the string date format for better reliability
-                limit=self.lookback_periods
-            )
-            
-            if not bars or len(bars) == 0:
-                logger.warning(f"No historical data available for {symbol} ({polygon_symbol})")
-                return None
+            try:
+                bars = self.data_feed.client.get_aggs(
+                    ticker=polygon_symbol,
+                    multiplier=self.timeframe_minutes,
+                    timespan="minute",
+                    from_=start_date_str,
+                    to=end_date_str,
+                    limit=api_request_limit
+                )
                 
-            # Convert to DataFrame
-            data = []
-            for bar in bars:
-                data.append({
-                    'timestamp': datetime.fromtimestamp(bar.timestamp / 1000),
-                    'open': bar.open,
-                    'high': bar.high,
-                    'low': bar.low,
-                    'close': bar.close,
-                    'volume': bar.volume,
-                    'vwap': getattr(bar, 'vwap', None)  # Some markets may not have VWAP
-                })
-            
-            df = pd.DataFrame(data)
-            logger.info(f"Successfully fetched {len(df)} historical bars for {symbol} ({polygon_symbol})")
-            return df
-            
-        except Exception as e:
-            logger.error(f"Error fetching historical data for {symbol}: {e}", exc_info=True)
+                if bars and len(bars) > 0:
+                    data = []
+                    for bar in bars:
+                        data.append({
+                            'timestamp': datetime.fromtimestamp(bar.timestamp / 1000),
+                            'open': bar.open,
+                            'high': bar.high,
+                            'low': bar.low,
+                            'close': bar.close,
+                            'volume': bar.volume,
+                            'vwap': getattr(bar, 'vwap', None)
+                        })
+                    
+                    df_attempt = pd.DataFrame(data)
+                    if not df_attempt.empty:
+                        collected_data_frames.append(df_attempt)
+                        
+                        # Combine all fetched data so far to check if we have enough
+                        # Use a temporary combined_df to check length without modifying final_df yet
+                        temp_combined_df = pd.concat(collected_data_frames)
+                        temp_combined_df = temp_combined_df.drop_duplicates(subset=['timestamp']).sort_values(by='timestamp', ascending=True)
+                        
+                        if len(temp_combined_df) >= self.lookback_periods:
+                            logger.info(f"Sufficient data ({len(temp_combined_df)} bars) collected for {symbol} after {attempt+1} attempts.")
+                            break 
+                else:
+                    logger.info(f"No data returned in batch {attempt + 1} for {symbol} from API with limit {api_request_limit} for window {start_date_str} to {end_date_str}.")
+
+            except Exception as e:
+                logger.error(f"Error fetching historical data batch {attempt + 1} for {symbol}: {e}", exc_info=True)
+                # Depending on error, might want to break or continue
+                # For now, we'll let it try the next batch if one fails
+
+        if not collected_data_frames:
+            logger.warning(f"No historical data fetched for {symbol} after {max_attempts} attempts from Polygon API.")
+            return None 
+
+        final_df = pd.concat(collected_data_frames)
+        # Deduplicate across all batches and sort by timestamp (oldest first)
+        final_df = final_df.drop_duplicates(subset=['timestamp']).sort_values(by='timestamp', ascending=True)
+        
+        logger.info(f"Total unique historical bars fetched for {symbol} across all attempts: {len(final_df)}")
+
+        if final_df.empty: # Should be caught by collected_data_frames check, but as a safeguard
+            logger.warning(f"Resulting DataFrame for {symbol} is empty after all attempts.")
             return None
-    
+
+        # Ensure we only use the most recent 'lookback_periods' candles if more were fetched
+        if len(final_df) >= self.lookback_periods:
+            final_df = final_df.tail(self.lookback_periods).reset_index(drop=True)
+            logger.info(f"Trimmed total historical data to {len(final_df)} bars for {symbol} to match lookback_periods ({self.lookback_periods})")
+        else: # len(final_df) < self.lookback_periods
+            logger.warning(f"Fetched {len(final_df)} total bars for {symbol}, which is less than the desired lookback_periods ({self.lookback_periods}). Indicator quality may be affected.")
+        
+        return final_df
+            
     def _generate_simulated_data(self, symbol: str) -> pd.DataFrame:
         """Generate simulated historical price data when real data is unavailable."""
         logger.info(f"Generating simulated historical data for {symbol}")

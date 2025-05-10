@@ -246,8 +246,8 @@ class TemporalLLMEngine:
                                 {"role": "system", "content": system_msg},
                                 {"role": "user", "content": user_content}
                             ],
-                            max_tokens=500,
-                            temperature=0.7
+                            max_completion_tokens=500,
+                            temperature=1  # Changed from 0.7 to 1
                         )
                         if hasattr(response, 'choices') and len(response.choices) > 0:
                             content = response.choices[0].message.content
@@ -267,8 +267,8 @@ class TemporalLLMEngine:
                                 {"role": "system", "content": system_msg},
                                 {"role": "user", "content": user_content}
                             ],
-                            max_tokens=500,
-                            temperature=0.7,
+                            max_completion_tokens=500,
+                            temperature=1,  # Changed from 0.7 to 1
                             request_timeout=api_timeout_seconds
                         )
                         if hasattr(response, 'choices') and len(response.choices) > 0:

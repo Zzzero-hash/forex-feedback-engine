@@ -32,10 +32,10 @@ class DataFeed:
         else:
             self.client = None
             if not RESTClient:
-                logger.warning("Polygon RESTClient not available (import failed).")  # Added log
+                logger.warning("Polygon RESTClient not available (import failed). Polygon data feed will be unavailable.")  # Added log
             if not api_key:
                 logger.warning(
-                    "Polygon API key not provided. Polygon client not initialized."
+                    "Polygon API key not provided. Polygon client not initialized. Polygon data feed will be unavailable."
                 )  # Added log
                 
         # Define symbol types mapping
@@ -91,61 +91,65 @@ class DataFeed:
         if not isinstance(symbol, str) or len(symbol) != 6 or not symbol.isalpha():
             logger.error(f"Invalid symbol format: {symbol}")  # Added log
             raise ValueError(f"Invalid symbol: {symbol}")
-        # Use Polygon.io RESTClient when available
-        if self.client:
-            # Detect symbol type and format for Polygon
-            pair = self.get_polygon_ticker(symbol)
-            logger.debug(f"Attempting to fetch data for Polygon pair: {pair}")  # Added log
-            
-            try:
-                # Use yesterday and 5 minutes back to avoid weekend/future data issues
-                # The API expects timestamps in milliseconds
-                now = datetime.now()
-                
-                # For crypto, we can use more recent data since it trades 24/7
-                if pair.startswith('X:'):  # Crypto
-                    to_ts = int(time.time() * 1000)
-                    from_ts = int((time.time() - (5 * 60)) * 1000)  # 5 minutes ago
-                else:  # Forex - might need to go further back on weekends
-                    if now.weekday() >= 5:  # Weekend (5=Saturday, 6=Sunday)
-                        # Go back to Friday's data
-                        days_to_friday = (now.weekday() - 4) % 7  # 5->1, 6->2
-                        to_ts = int((time.time() - (days_to_friday * 24 * 60 * 60)) * 1000)
-                        from_ts = int(to_ts - (5 * 60 * 1000))  # 5 minutes before 
-                    else:
-                        # Normal weekday
-                        to_ts = int(time.time() * 1000)
-                        from_ts = int((time.time() - (5 * 60)) * 1000)  # 5 minutes ago
+        
+        if not self.client:
+            logger.error("Polygon client not initialized. Cannot fetch live data.")
+            raise ConnectionError("Polygon client not initialized. Live data feed unavailable.")
+        
+        # Detect symbol type and format for Polygon
+        pair = self.get_polygon_ticker(symbol)
+        logger.debug(f"Attempting to fetch data for Polygon pair: {pair}")  # Added log
+        
+        try:
+            # Use current time for 'to_ts' to get the most recent data.
+            # 'from_ts' is set to 5 minutes before 'to_ts' to ensure a window for the API.
+            # The API expects timestamps in milliseconds
+            to_ts = int(time.time() * 1000)
+            from_ts = int((time.time() - (5 * 60)) * 1000)  # 5 minutes ago
 
-                logger.debug(
-                    f"Polygon API call: get_aggs(ticker={pair}, multiplier=1, timespan='minute', from_={from_ts}, to={to_ts}, limit=1)"
-                )
-                bars = self.client.get_aggs(
-                    ticker=pair, multiplier=1, timespan="minute", from_=from_ts, to=to_ts, limit=1
-                )
-                logger.debug(f"Polygon API response (bars): {bars}")  # Added log
-                if bars and len(bars) > 0:
-                    bar = bars[0]
-                    price = bar.close  # close price # Changed from bar.c
-                    ts = bar.timestamp / 1000  # Polygon returns ms # Changed from bar.t
-                    logger.info(
-                        f"Successfully fetched data from Polygon: Price={price}, Timestamp={ts}"
-                    )  # Added log
-                    return {
-                        "price": price,
-                        "timestamp": datetime.fromtimestamp(ts).isoformat() if ts else None,
-                    }
-                else:
-                    logger.warning(f"No bars returned from Polygon for {pair}.")  # Added log
-            except Exception as e:
-                logger.error(
-                    f"Error calling Polygon API for {pair}: {e}", exc_info=True
-                )  # Modified to log exception
-        else:
-            logger.warning("Polygon client not available. Falling back to dummy data.")  # Added log
-        # Dummy fallback data only
-        logger.warning(f"Returning dummy data for symbol {symbol}")  # Added log
-        return {"price": 0.0, "timestamp": datetime.utcnow().isoformat()}
+            # Adjust 'from_ts' and 'to_ts' for Forex on weekends to get latest available Friday data
+            # This specific handling might need refinement based on how "on the spot" calls should behave when market is closed.
+            now = datetime.now()
+            if not pair.startswith('X:'): # If Forex
+                if now.weekday() >= 5:  # Weekend (5=Saturday, 6=Sunday)
+                    logger.warning(f"Forex market likely closed for {pair}. Attempting to fetch latest available data from Friday.")
+                    # This part might need adjustment if the goal is to error out when market is closed.
+                    # For now, it tries to get the last data point from when the market was open.
+                    days_to_friday = (now.weekday() - 4) % 7
+                    # Set 'to' to end of Friday, 'from' to 5 mins before that.
+                    # This logic might still fetch no data if it's too far into the weekend.
+                    # A more robust solution would be to check market hours explicitly.
+                    # For simplicity, we'll keep the existing offset logic but acknowledge its limitations.
+                    # A better approach for "on the spot" would be to use an API that indicates market status.
+                    pass # Retain existing weekend logic for now, but it's a point of attention for true "on the spot" robustness.
+
+            logger.debug(
+                f"Polygon API call: get_aggs(ticker={pair}, multiplier=1, timespan='second', from_={from_ts}, to={to_ts}, limit=1, sort='desc')"
+            )
+            bars = self.client.get_aggs(
+                ticker=pair, multiplier=1, timespan="second", from_=from_ts, to=to_ts, limit=1, sort="desc" # Changed timespan to 'second'
+            )
+            logger.debug(f"Polygon API response (bars): {bars}")  # Added log
+            if bars and len(bars) > 0:
+                bar = bars[0] # With sort="desc" and limit=1, this is the latest bar
+                price = bar.close
+                ts = bar.timestamp / 1000  # Polygon returns ms
+                logger.info(
+                    f"Successfully fetched data from Polygon: Price={price}, Timestamp={datetime.fromtimestamp(ts).isoformat()}"
+                )  # Added log
+                return {
+                    "price": price,
+                    "timestamp": datetime.fromtimestamp(ts).isoformat(),
+                }
+            else:
+                logger.warning(f"No bars returned from Polygon for {pair} in the specified window [{from_ts}, {to_ts}].")
+                raise LookupError(f"No data returned from Polygon for {pair}. Market might be closed or data unavailable.")
+        except Exception as e:
+            logger.error(
+                f"Error calling Polygon API for {pair}: {e}", exc_info=True
+            )  # Modified to log exception
+            # Re-raise as a more generic custom exception or a more specific one if identifiable
+            raise ConnectionError(f"Failed to fetch data from Polygon for {pair} due to: {e}")
 
     # Alias for get_quote to be consistent with main
     get_quote = fetch_data

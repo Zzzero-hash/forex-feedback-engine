@@ -5,6 +5,8 @@ from .data.data_feed import DataFeed
 from .data.otc_feed import OTCFeed
 from .decision.llm_engine_temporal import TemporalLLMEngine
 from .config import Config
+from src.execution.broker_api import BrokerAPI
+from src.feedback.feedback_loop import FeedbackLoop
 # Alias legacy LLMEngine name for backward compatibility and tests
 LLMEngine = TemporalLLMEngine
 
@@ -218,7 +220,7 @@ def main():
     # Initialize temporal LLM engine with historical context
     engine        = LLMEngine(api_key=cfg.openai_api_key)
     engine.initialize_historical_collector(data_feed, lookback_periods=20, timeframe_minutes=5)
-    broker_api    = BrokerAPI(ssid=cfg.po_ssid)
+    broker_api    = BrokerAPI(ssid=cfg.po_ssid, data_feed_instance=data_feed) # Pass data_feed here
     feedback_loop = FeedbackLoop(database_url=cfg.database_url)
     
     # Retrieve OTC symbols from feed
