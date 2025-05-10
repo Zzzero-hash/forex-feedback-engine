@@ -97,44 +97,29 @@ To run the trading system:
 2. **Install Dependencies**:
 
    ```bash
-   pip install -e .
+   pip install .
    ```
 
-   This command installs the package in editable mode, including all dependencies specified in `pyproject.toml`.
+   This command builds and installs the package, making the `forex-engine` command available in your environment.
 
 3. **Run the Application**:
 
-   You can run the application directly using Python:
-
-   ```bash
-   python -m src.main
-   ```
-
-   Or, if the console script is set up in `pyproject.toml` (see below), you can use:
+   After installation, you can run the application using the `forex-engine` command:
 
    ```bash
    forex-engine
    ```
 
    **CLI Arguments (Optional):**
-   The `src/main.py` script will support command-line arguments to override default configurations or environment variables. For example:
+   You can customize the behavior using command-line arguments. For example:
 
    ```bash
-   python -m src.main --symbol EURUSD --trade_amount 10 --profit_target 5 --loss_limit 2 --log_level DEBUG
+   forex-engine --symbol EURUSD --trade_amount 10 --profit_target 5 --loss_limit 2 --log_level DEBUG
    ```
 
-   Run `python -m src.main --help` for a full list of available options.
+   Run `forex-engine --help` for a full list of available options.
 
-## CLI Setup
-
-To make the application easily runnable from the command line (e.g., as `forex-engine`), ensure the following is present in your `pyproject.toml`:
-
-```toml
-[project.entry-points."console_scripts"]
-forex-engine = "src.main:main_cli"
-```
-
-And ensure `src/main.py` has a `main_cli()` function that uses `argparse` to handle command-line arguments.
+   (For development or running directly from source without full installation, you can also use `python -m src.main`)
 
 ## Next Steps
 
