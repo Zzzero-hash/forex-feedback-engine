@@ -60,6 +60,9 @@ dev = [
 # [project.entry-points."console_scripts"]
 # forex-engine = "src.main:main"
 
+[project.entry-points."console_scripts"]
+forex-engine = "src.main:main_cli"
+
 [tool.setuptools.packages.find]
 where = ["src"]  # Tells setuptools to find packages under the 'src' directory
 namespaces = false

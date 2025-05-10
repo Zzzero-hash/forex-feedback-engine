@@ -1,6 +1,7 @@
 import time
 import logging
 import datetime
+import argparse # Added for CLI arguments
 from .data.data_feed import DataFeed
 from .data.otc_feed import OTCFeed
 from .decision.llm_engine_temporal import TemporalLLMEngine
@@ -201,11 +202,24 @@ def run_session(cfg, data_feed, otc_feed, engine, broker_api, feedback_loop, sym
 
     return feedback_loop.trade_history
 
-def main():
+
+def main(cfg_override=None): # Modified to accept potential overrides
     # Initialize components
     cfg = Config()
+
+    # Override config with CLI args if provided
+    if cfg_override:
+        for key, value in vars(cfg_override).items():
+            if value is not None and hasattr(cfg, key):
+                setattr(cfg, key, value)
+                logging.info(f"Overriding config: {key} = {value}")
+            elif value is not None and key == "symbol": # Special handling for initial symbol
+                # This will be handled later by initial_selected_symbol logic
+                pass
+
+
     # Configure logging
-    logging.basicConfig(level=cfg.log_level)
+    logging.basicConfig(level=cfg.log_level, format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
     # Ensure required API keys are provided
     # Warn if API keys are missing, but continue for testing or fallback
     if not cfg.openai_api_key:
@@ -218,7 +232,7 @@ def main():
     data_feed     = DataFeed(api_key=cfg.polygon_api_key)
     otc_feed      = OTCFeed()
     # Initialize temporal LLM engine with historical context
-    engine        = LLMEngine(api_key=cfg.openai_api_key)
+    engine        = LLMEngine(api_key=cfg.openai_api_key, model_name=cfg.llm_model) # Pass model_name
     engine.initialize_historical_collector(data_feed, lookback_periods=20, timeframe_minutes=5)
     broker_api    = BrokerAPI(ssid=cfg.po_ssid, data_feed_instance=data_feed) # Pass data_feed here
     feedback_loop = FeedbackLoop(database_url=cfg.database_url)
@@ -251,9 +265,20 @@ def main():
     
     logging.info(f"Available symbols: {symbols}")
 
-    # Select best trading symbol via LLM with market data
-    logging.info("Selecting best trading pair using real-time market data...")
-    initial_selected_symbol = engine.select_pair(symbols, data_feed)
+    # Allow CLI to override initial symbol selection
+    initial_selected_symbol = None
+    if cfg_override and cfg_override.symbol:
+        if cfg_override.symbol in symbols:
+            initial_selected_symbol = cfg_override.symbol
+            logging.info(f"Initial symbol overridden by CLI: {initial_selected_symbol}")
+        else:
+            logging.warning(f"CLI specified symbol '{cfg_override.symbol}' not in available symbols. Proceeding with LLM selection.")
+
+    if not initial_selected_symbol:
+        # Select best trading symbol via LLM with market data
+        logging.info("Selecting best trading pair using real-time market data...")
+        initial_selected_symbol = engine.select_pair(symbols, data_feed)
+
     if not initial_selected_symbol or initial_selected_symbol not in symbols:
         logging.error(f"Failed to select a valid initial trading symbol from the available list. Selected: {initial_selected_symbol}. Defaulting to the first symbol if available.")
         if not symbols:
@@ -274,5 +299,20 @@ def main():
     # Pass the initially selected symbol as a keyword for backward compatibility tests
     run_session(cfg, data_feed, otc_feed, engine, broker_api, feedback_loop, symbols, initial_symbol_idx, symbol=initial_selected_symbol)
 
+def main_cli():
+    parser = argparse.ArgumentParser(description="Forex Feedback Engine CLI")
+    parser.add_argument("--symbol", type=str, help="Initial trading symbol to use (e.g., EURUSD). Overrides LLM selection if valid.")
+    parser.add_argument("--trade_amount", type=float, help="Amount for each trade.")
+    parser.add_argument("--profit_target_pct", type=float, help="Profit target percentage for the session.")
+    parser.add_argument("--loss_limit_pct", type=float, help="Loss limit percentage for the session.")
+    parser.add_argument("--initial_balance", type=float, help="Initial balance for the trading session.")
+    parser.add_argument("--llm_model", type=str, help="Name of the LLM model to use (e.g., o4-mini, gpt-3.5-turbo).")
+    parser.add_argument("--log_level", type=str, choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Logging level.")
+    parser.add_argument("--enable_demo_mode", type=lambda x: (str(x).lower() == 'true'), help="Enable demo (signal-only) mode (true/false).")
+    # Add other relevant config overrides here if needed
+
+    args = parser.parse_args()
+    main(cfg_override=args)
+
 if __name__ == "__main__":
-    main()
+    main_cli()
