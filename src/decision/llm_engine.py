@@ -35,7 +35,7 @@ except ImportError:
     raise ImportError("OpenAI library not installed. Run 'pip install openai'")
 
 class LLMEngine:
-    def __init__(self, api_key, prompt_config=None, model="o4-mini"):
+    def __init__(self, api_key, prompt_config=None, model="gpt-4"):  # updated default model
         self.api_key = api_key
         self.model = model
         
@@ -67,7 +67,7 @@ class LLMEngine:
 
         for attempt in range(max_retries):
             try:
-                # Use the configured model (default is o4-mini)
+                # Use the configured model (default is gpt-4)
                 current_model_to_use = self.model
                 logger.debug(f"Attempting OpenAI API call with model: {current_model_to_use}, timeout: {api_timeout_seconds}s")
 

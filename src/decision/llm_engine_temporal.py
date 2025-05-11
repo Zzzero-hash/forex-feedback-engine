@@ -56,7 +56,7 @@ except ImportError:
     raise ImportError("OpenAI library not installed. Run 'pip install openai'")
 
 class TemporalLLMEngine:
-    def __init__(self, api_key, prompt_config=None, model="o4-mini"):
+    def __init__(self, api_key, prompt_config=None, model="gpt-4"):  # updated default model
         self.api_key = api_key
         self.model = model
         self.client = None

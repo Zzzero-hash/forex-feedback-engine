@@ -40,7 +40,7 @@ def test_get_decision_call(llm_engine):
     assert decision == "CALL"
     llm_engine.client.chat.completions.create.assert_called_once()
     call_args = llm_engine.client.chat.completions.create.call_args
-    assert call_args[1]['model'] == "o4-mini"
+    assert call_args[1]['model'] == "gpt-4"
     assert call_args[1]['messages'][0]['role'] == "system"
     assert call_args[1]['messages'][1]['role'] == "user"
     assert "Market Data: {'price': '1.1000'}" in call_args[1]['messages'][1]['content']
@@ -118,7 +118,7 @@ def test_select_pair_success(llm_engine):
     # Verify that the client was called
     llm_engine.client.chat.completions.create.assert_called_once()
     call_args = llm_engine.client.chat.completions.create.call_args
-    assert call_args[1]['model'] == 'o4-mini'  # Updated to use o4-mini
+    assert call_args[1]['model'] == 'gpt-4'  # Updated to use gpt-4
     msgs = call_args[1]['messages']
     assert msgs[0]['role'] == 'system'
     assert 'Available symbols' in msgs[1]['content']

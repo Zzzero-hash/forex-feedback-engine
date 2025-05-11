@@ -232,7 +232,7 @@ def main(cfg_override=None): # Modified to accept potential overrides
     data_feed     = DataFeed(api_key=cfg.polygon_api_key)
     otc_feed      = OTCFeed()
     # Initialize temporal LLM engine with historical context
-    engine        = LLMEngine(api_key=cfg.openai_api_key, model_name=cfg.llm_model) # Pass model_name
+    engine        = LLMEngine(api_key=cfg.openai_api_key, model=cfg.llm_model) # Pass model
     engine.initialize_historical_collector(data_feed, lookback_periods=20, timeframe_minutes=5)
     broker_api    = BrokerAPI(ssid=cfg.po_ssid, data_feed_instance=data_feed) # Pass data_feed here
     feedback_loop = FeedbackLoop(database_url=cfg.database_url)
@@ -306,7 +306,7 @@ def main_cli():
     parser.add_argument("--profit_target_pct", type=float, help="Profit target percentage for the session.")
     parser.add_argument("--loss_limit_pct", type=float, help="Loss limit percentage for the session.")
     parser.add_argument("--initial_balance", type=float, help="Initial balance for the trading session.")
-    parser.add_argument("--llm_model", type=str, help="Name of the LLM model to use (e.g., o4-mini, gpt-3.5-turbo).")
+    parser.add_argument("--llm_model", type=str, help="Name of the LLM model to use (e.g., gpt-4, gpt-4-turbo).")
     parser.add_argument("--log_level", type=str, choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Logging level.")
     parser.add_argument("--enable_demo_mode", type=lambda x: (str(x).lower() == 'true'), help="Enable demo (signal-only) mode (true/false).")
     # Add other relevant config overrides here if needed

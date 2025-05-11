@@ -74,7 +74,7 @@ def test_openai_api():
         return False
         
     try:
-        engine = TemporalLLMEngine(api_key=api_key, model="o4-mini")
+        engine = TemporalLLMEngine(api_key=api_key, model="gpt-4")
         logger.info(f"Successfully initialized OpenAI client: {engine.client is not None}")
         
         # Test a simple completion

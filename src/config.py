@@ -46,6 +46,7 @@ class Config:
     loss_limit_pct = float(os.getenv("LOSS_LIMIT_PCT", 2.0))
     initial_balance = float(os.getenv("INITIAL_BALANCE", 1000.0))
     polygon_api_key = os.getenv("POLYGON_API_KEY")
+    llm_model = os.getenv("LLM_MODEL", "gpt-4")  # Default LLM model
     max_consecutive_no_trade = int(os.getenv("MAX_CONSECUTIVE_NO_TRADE", 5)) # Max consecutive "NO TRADE" signals before switching pairs
     pair_blacklist_duration_seconds = int(os.getenv("PAIR_BLACKLIST_DURATION_SECONDS", 3600)) # Duration to blacklist a pair after inactivity
     max_consecutive_system_switches = int(os.getenv("MAX_CONSECUTIVE_SYSTEM_SWITCHES", 3)) # Max consecutive pair switches before system cooldown

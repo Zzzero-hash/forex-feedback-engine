@@ -69,7 +69,7 @@ def test_openai_api_fix():
     logger.info("\n--- Testing OpenAI API Fix ---")
     
     # 1. Initialize with invalid key to test fallbacks
-    engine = TemporalLLMEngine(api_key="invalid_key_to_test_fallbacks", model="o4-mini")
+    engine = TemporalLLMEngine(api_key="invalid_key_to_test_fallbacks", model="gpt-4")
     
     # 2. Test API call with fallbacks
     system_msg = "You are a helpful assistant."

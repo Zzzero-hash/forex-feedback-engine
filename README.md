@@ -7,7 +7,7 @@ This project is a feedback-loop driven trading system designed for binary option
 ## Features
 
 - Signal-Only Mode: System generates trading signals without executing real trades
-- OpenAI Integration: Uses o4-mini LLM model to make trading decisions (configurable)
+- OpenAI Integration: Uses gpt-4 LLM model to make trading decisions (configurable)
 - Enhanced Pair Selection: Uses real-time market data and technical indicators for better trading pair selection
 - Technical Analysis: Calculates RSI, volatility, momentum and price changes for more informed decisions
 - Risk Management: Configurable profit targets and loss limits
@@ -34,7 +34,7 @@ This project is a feedback-loop driven trading system designed for binary option
    - Implemented smart detection of symbol types (forex vs. crypto).
    - Added correct formatting for Polygon API tickers (C: for forex, X: for crypto).
    - System now automatically prioritizes crypto symbols on weekends.
-5. **Updated LLM Model**: Changed from "gpt-3.5-turbo" to "o4-mini" for improved performance (still configurable).
+5. **Updated LLM Model**: Changed from "gpt-4-turbo" to "gpt-4" for improved performance (still configurable).
 6. **Signal-Only Mode**: System can operate in signal-only mode, generating trading signals without executing real trades.
 7. **Enhanced Trading Pair Selection**: Improved algorithm now uses real-time market data and technical indicators.
 8. **Expanded Forex Pairs**: Updated to include a comprehensive list of 28 major and minor forex pairs.
@@ -84,7 +84,7 @@ To run the trading system:
    - `DATABASE_URL` (Optional): SQLAlchemy connection string for storing trade history (e.g., `sqlite:///trading_logs.db`). Defaults to an in-memory SQLite database if not set.
    - `ENABLE_DEMO_MODE` (Optional): Set to `true` to run in signal-only mode, even if `PO_SSID` is provided. Defaults to `false`.
    - `LOG_LEVEL` (Optional): Set the logging level (e.g., `DEBUG`, `INFO`, `WARNING`). Defaults to `INFO`.
-   - `LLM_MODEL` (Optional): Specify the LLM model to be used (e.g., `o4-mini`, `gpt-3.5-turbo`). Defaults to `o4-mini`.
+   - `LLM_MODEL` (Optional): Specify the LLM model to be used (e.g., `gpt-4`, `gpt-4-turbo`). Defaults to `gpt-4`.
 
    Example for PowerShell:
 
