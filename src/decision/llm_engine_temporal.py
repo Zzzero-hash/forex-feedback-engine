@@ -233,7 +233,6 @@ class TemporalLLMEngine:
                 # Use the configured model
                 current_model_to_use = self.model
                 
-                response = None
                 content = None
                 
                 # Use the appropriate API based on version
@@ -246,44 +245,28 @@ class TemporalLLMEngine:
                                 {"role": "system", "content": system_msg},
                                 {"role": "user", "content": user_content}
                             ],
-                            max_completion_tokens=500,
+                            max_completion_tokens=500,  # Renamed from max_tokens to max_completion_tokens
                             temperature=1  # Changed from 0.7 to 1
                         )
                         if hasattr(response, 'choices') and len(response.choices) > 0:
                             content = response.choices[0].message.content
                             logger.debug("Successfully called OpenAI v1.x API")
-                            break
                     except Exception as e:
                         logger.error(f"Error with OpenAI v1.x API call: {str(e)}")
-                        # Continue to fallback methods
+                        # If v1.x fails, content will remain None, and it will proceed to dummy response or retry logic
                 
-                # Try the legacy v0.x API if v1.x failed
-                if not content:
-                    try:
-                        # For v0.x API
-                        response = openai.ChatCompletion.create( # type: ignore
-                            model=current_model_to_use,
-                            messages=[
-                                {"role": "system", "content": system_msg},
-                                {"role": "user", "content": user_content}
-                            ],
-                            max_completion_tokens=500,
-                            temperature=1,  # Changed from 0.7 to 1
-                            request_timeout=api_timeout_seconds
-                        )
-                        if hasattr(response, 'choices') and len(response.choices) > 0:
-                            content = response.choices[0].message['content']
-                            logger.debug("Successfully called OpenAI v0.x API")
-                            break
-                    except Exception as e:
-                        logger.error(f"Error with OpenAI v0.x API call: {str(e)}")
+                # If v1.x API call was successful and produced content, break from retry loop
+                if content:
+                    break
                 
-                # If we reached here without a response, retry or use fallback
-                if not content and attempt == max_retries - 1:
+                # If we reached here without a response (e.g. v1.x API failed or was not attempted and content is still None)
+                if attempt == max_retries - 1:
                     # Last attempt failed, use fallback
+                    logger.warning("All API attempts failed. Using fallback dummy response.")
                     content = create_dummy_response()
-                elif not content:
+                else:
                     # Retry with backoff
+                    logger.info(f"API call failed on attempt {attempt + 1}. Retrying in {backoff}s...")
                     time.sleep(backoff)
                     backoff *= 2
                 
