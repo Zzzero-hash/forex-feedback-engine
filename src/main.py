@@ -2,6 +2,7 @@ import time
 import logging
 import datetime
 import argparse # Added for CLI arguments
+import re # Added for parsing payouts
 from .data.data_feed import DataFeed
 from .data.otc_feed import OTCFeed
 from .decision.llm_engine_temporal import TemporalLLMEngine
@@ -10,6 +11,60 @@ from src.execution.broker_api import BrokerAPI
 from src.feedback.feedback_loop import FeedbackLoop
 # Alias legacy LLMEngine name for backward compatibility and tests
 LLMEngine = TemporalLLMEngine
+
+# Placeholder for the HTML content from https://pocketoption.com/en/assets/
+# In a real application, this would be fetched dynamically.
+# For this implementation, we'll use the structure observed from the fetch_webpage tool.
+# Example: "EUR/USD Asset is available for trading at the moment 81% ..."
+POCKET_OPTION_ASSETS_HTML_CONTENT = """
+MONDAYTUESDAYWEDNESDAYTHURSDAYFRIDAYSATURDAYSUNDAY  ASSETS (UTC+2) PAYOUT  WORKING HOURS  00  01  02  03  04  05  06  07  08  09  10  11  12  13  14  15  16  17  18  19  20   21  22  23  24  Currency   EUR/USD    Asset is available for trading at the moment 81%                                                                                   from 02:00 to 22:45   AUD/CAD    Asset is available for trading at the moment 45%                                                                                  from ...
+GBP/JPY    Asset is available for trading at the moment 90%
+USD/CHF    Asset is available for trading at the moment 85%
+NZD/USD    Asset is available for trading at the moment 70%
+EUR/AUD    Asset is available for trading at the moment 50%
+Crypto IDX Asset is available for trading at the moment 92%
+Apple Asset is available for trading at the moment 20%
+Google Asset is available for trading at the moment 20%
+""" # This is a simplified representation of the HTML structure.
+
+def get_payout_data_from_html(html_content: str) -> dict[str, int]:
+    """
+    Parses HTML content to extract asset symbols and their payout percentages.
+    Expected format in HTML: "SYMBOL Asset is available for trading at the moment PAYOUT%"
+    Example: "EUR/USD Asset is available for trading at the moment 81%"
+    """
+    payouts = {}
+    # Regex to find symbol (e.g., EUR/USD, GBPJPY, Crypto IDX) and payout percentage
+    # It captures the symbol (group 1) and the payout number (group 2)
+    pattern = re.compile(r"([A-Z]{3}/?[A-Z]{3}|[A-Za-z0-9\s]+?IDX)\s+Asset is available for trading at the moment\s+(\d+)%", re.IGNORECASE)
+    
+    for line in html_content.splitlines():
+        match = pattern.search(line)
+        if match:
+            symbol_raw = match.group(1).strip()
+            payout_val = int(match.group(2))
+            
+            # Normalize currency pair symbols: EUR/USD -> EURUSD
+            if '/' in symbol_raw and len(symbol_raw) == 7 and symbol_raw[3] == '/':
+                symbol_normalized = symbol_raw.replace("/", "")
+            else: # For other assets like "Crypto IDX", keep as is or define specific normalization
+                symbol_normalized = symbol_raw.upper() # Convert to uppercase for consistency
+
+            # Only add if it looks like a forex pair or a known structure like "CRYPTO IDX"
+            # This avoids adding things like "Apple" or "Google" if they match the payout pattern
+            # but are not forex pairs handled by the current otc_feed.
+            # Adjust this condition if other asset types from PocketOption are to be handled.
+            if len(symbol_normalized) == 6 and symbol_normalized.isalpha(): # Standard Forex pair
+                 payouts[symbol_normalized] = payout_val
+            elif "IDX" in symbol_normalized: # Indices like Crypto IDX
+                 payouts[symbol_normalized] = payout_val
+            # Add more conditions here if other specific asset types are needed.
+            
+    if not payouts:
+        logging.warning("Could not parse any payout data from the provided HTML content.")
+    else:
+        logging.info(f"Parsed payouts for {len(payouts)} assets: {payouts}")
+    return payouts
 
 def run_session(cfg, data_feed, otc_feed, engine, broker_api, feedback_loop, symbols_list, initial_symbol_idx, max_iterations=None, **kwargs):
     """
@@ -229,6 +284,13 @@ def main(cfg_override=None): # Modified to accept potential overrides
     if not cfg.polygon_api_key:
         logging.warning("Polygon.io API key not set. Proceeding without real market data.")
         
+    # Fetch and parse asset payouts from PocketOption (using placeholder HTML content)
+    # In a live system, you'd fetch this HTML content dynamically.
+    # For now, we use the POCKET_OPTION_ASSETS_HTML_CONTENT defined above.
+    # If you have a way to get the live HTML content, replace POCKET_OPTION_ASSETS_HTML_CONTENT.
+    logging.info("Attempting to parse asset payouts from PocketOption data.")
+    payout_data = get_payout_data_from_html(POCKET_OPTION_ASSETS_HTML_CONTENT)
+
     data_feed     = DataFeed(api_key=cfg.polygon_api_key)
     otc_feed      = OTCFeed()
     # Initialize temporal LLM engine with historical context
@@ -243,27 +305,60 @@ def main(cfg_override=None): # Modified to accept potential overrides
     # raw_symbols may be a dict or list; convert to list
     if not raw_symbols:
         logging.warning("No OTC symbols retrieved from OTCFeed. Using default symbols.")
-        forex_symbols = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD"]
+        forex_symbols_from_feed = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD"] # Default if OTC feed fails
     else:
-        forex_symbols = list(raw_symbols.keys() if isinstance(raw_symbols, dict) else raw_symbols)
+        forex_symbols_from_feed = list(raw_symbols.keys() if isinstance(raw_symbols, dict) else raw_symbols)
     
     # Add cryptocurrency symbols for weekend trading
     # These popular crypto pairs should be available 24/7 on Polygon
-    crypto_symbols = ["BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "ADAUSD"]
+    crypto_symbols = ["BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "ADAUSD"] # Define your crypto list
     
     # Detect if it's weekend to prioritize crypto symbols
     now = datetime.datetime.now()
     is_weekend = now.weekday() >= 5  # 5=Saturday, 6=Sunday
     
+    active_symbols = []
     if is_weekend:
-        logging.info("Weekend detected: Prioritizing cryptocurrency symbols that trade 24/7")
-        # Use crypto first, then forex as fallback
-        symbols = crypto_symbols + forex_symbols
+        logging.info("Weekend detected: Trading is restricted to cryptocurrency symbols.")
+        active_symbols = crypto_symbols
+        # Optionally, filter crypto_symbols if they also appear in payout_data and meet criteria
+        # For now, all defined crypto_symbols are considered active on weekends.
     else:
-        # Use all available symbols, forex first
-        symbols = forex_symbols + crypto_symbols
+        logging.info("Weekday detected: Prioritizing forex symbols based on payout.")
+        if not payout_data:
+            logging.warning("No payout data available. Using all symbols from OTC feed without payout ranking.")
+            ranked_forex_symbols = forex_symbols_from_feed
+        else:
+            forex_symbols_with_payout = []
+            for symbol in forex_symbols_from_feed:
+                if symbol in payout_data:
+                    forex_symbols_with_payout.append({"symbol": symbol, "payout": payout_data[symbol]})
+                else:
+                    logging.debug(f"Forex symbol {symbol} from OTC feed not found in parsed payout data. It will be excluded if better options exist or ranked lower.")
+            
+            if forex_symbols_with_payout:
+                # Sort by payout, descending
+                forex_symbols_with_payout.sort(key=lambda x: x["payout"], reverse=True)
+                ranked_forex_symbols = [item["symbol"] for item in forex_symbols_with_payout]
+                logging.info(f"Forex symbols ranked by payout: {ranked_forex_symbols}")
+                # Include forex symbols from feed that were not in payout list, at the end
+                other_forex_symbols = [s for s in forex_symbols_from_feed if s not in payout_data]
+                if other_forex_symbols:
+                    logging.info(f"Appending other forex symbols without specific payout data: {other_forex_symbols}")
+                    ranked_forex_symbols.extend(other_forex_symbols)
+            else:
+                logging.warning("No forex symbols from OTC feed found in payout data or payout data was empty. Using original forex symbols list.")
+                ranked_forex_symbols = forex_symbols_from_feed
+
+        active_symbols = ranked_forex_symbols + crypto_symbols # Add crypto as alternatives or for diversification
     
-    logging.info(f"Available symbols: {symbols}")
+    symbols = list(dict.fromkeys(active_symbols)) # Remove duplicates while preserving order
+
+    if not symbols:
+        logging.error("No active symbols available for trading after filtering. Exiting.")
+        return # Exit if no symbols are left
+    
+    logging.info(f"Final list of symbols for trading session: {symbols}")
 
     # Allow CLI to override initial symbol selection
     initial_selected_symbol = None
